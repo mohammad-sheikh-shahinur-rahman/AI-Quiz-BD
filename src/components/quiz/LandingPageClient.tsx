@@ -2,9 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import Logo from './Logo';
 import { Button } from '@/components/ui/button';
-import { ArrowRight } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowRight, Link as LinkIcon } from 'lucide-react';
 
 const LandingPageClient = () => {
   const router = useRouter();
@@ -39,7 +41,50 @@ const LandingPageClient = () => {
           <ArrowRight className="ml-2 h-5 w-5" />
         </Button>
       </div>
-       <footer className="absolute bottom-6 text-center w-full text-muted-foreground text-sm">
+
+      <div className={`mt-16 w-full max-w-md mx-auto transition-opacity duration-1000 ease-out ${isVisible ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '500ms' }}>
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-xl font-headline text-center text-primary">ডেভেলপার পরিচিতি</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center text-center">
+            <Image 
+              src="https://m.media-amazon.com/images/S/amzn-author-media-prod/b02mvc2hucu96hchlksdjmogii._SY450_CR0%2C0%2C450%2C450_.jpg" 
+              alt="মোহাম্মদ শেখ শাহিনুর রহমান" 
+              width={120} 
+              height={120} 
+              className="rounded-full mb-4 shadow-md border-2 border-primary/50"
+              priority
+            />
+            <h3 className="text-lg font-semibold text-primary">মোহাম্মদ শেখ শাহিনুর রহমান</h3>
+            <p className="text-xs text-foreground/80 mt-1 mb-3 px-2">
+              কবি | লেখক | সফটওয়্যার ইঞ্জিনিয়ার | প্রোগ্রামার <br/> ডিজিটাল ফরেনসিক বিশেষজ্ঞ | প্রযুক্তি উদ্ভাবক
+            </p>
+            <div className="mt-3 space-y-1">
+              <p className="text-sm font-medium text-foreground/90 mb-1">আরও জানুন:</p>
+              <a 
+                href="https://mohammad-sheikh-shahinur-rahman.vercel.app/" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="inline-flex items-center text-sm text-accent hover:underline hover:text-accent/80 transition-colors"
+              >
+                <LinkIcon className="mr-1.5 h-3.5 w-3.5" /> Personal Website
+              </a>
+              <br/>
+              <a 
+                href="http://shahinur.amadersomaj.com/" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="inline-flex items-center text-sm text-accent hover:underline hover:text-accent/80 transition-colors"
+              >
+                <LinkIcon className="mr-1.5 h-3.5 w-3.5" /> AmaderSomaj Profile
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+       <footer className="relative mt-12 mb-6 text-center w-full text-muted-foreground text-sm">
         <p>&copy; {new Date().getFullYear()} AI Quiz BD Lite. সর্বস্বত্ব সংরক্ষিত।</p>
       </footer>
     </div>
@@ -47,18 +92,3 @@ const LandingPageClient = () => {
 };
 
 export default LandingPageClient;
-
-// Add this to your globals.css or tailwind.config.js if you want to use animation-delay utilities
-// For tailwind.config.js under theme.extend.animation:
-// 'fade-in-up': 'fade-in-up 0.5s ease-out forwards', (already added based on thought process)
-// And you can add animationDelay utilities if needed, e.g. with a plugin, or inline style for simplicity.
-// For simplicity, let's assume `animate-fade-in-up` already exists and we use inline style for delay if necessary,
-// or create utility classes for animation delays if many are needed.
-// The prompt implied "stylish animated Bangla UI", so these simple animations should suffice.
-// The `animation-delay` classes here are conceptual. You might need to define them or use inline styles.
-// Using `animate-fade-in-up` which was added to tailwind.config.ts
-// We can create simple delay utilities in globals.css if needed:
-// .animation-delay-300 { animation-delay: 300ms; }
-// .animation-delay-600 { animation-delay: 600ms; }
-// For this, I'll assume `animate-fade-in-up` is sufficient as a base animation for the text.
-// The button has `animate-pulse-once`.
