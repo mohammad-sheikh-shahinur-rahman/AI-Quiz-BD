@@ -7,7 +7,7 @@ import Image from 'next/image';
 import Logo from './Logo';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, Link as LinkIcon } from 'lucide-react';
+import { ArrowRight, Link as LinkIcon, UserCircle } from 'lucide-react';
 
 const LandingPageClient = () => {
   const router = useRouter();
@@ -24,7 +24,7 @@ const LandingPageClient = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center">
+    <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center bg-background">
       <div 
         className={`transition-all duration-1000 ease-out ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
       >
@@ -44,9 +44,12 @@ const LandingPageClient = () => {
       </div>
 
       <div className={`mt-16 w-full max-w-md mx-auto transition-opacity duration-1000 ease-out ${isVisible ? 'opacity-100' : 'opacity-0'}`} style={{ transitionDelay: '500ms' }}>
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-xl font-headline text-center text-primary">ডেভেলপার পরিচিতি</CardTitle>
+        <Card className="shadow-xl rounded-lg border border-border/50">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-center mb-2">
+              <UserCircle className="w-7 h-7 text-primary mr-2" />
+              <CardTitle className="text-xl font-headline text-center text-primary">ডেভেলপার পরিচিতি</CardTitle>
+            </div>
           </CardHeader>
           <CardContent className="flex flex-col items-center text-center">
             <Image 
@@ -58,10 +61,13 @@ const LandingPageClient = () => {
               priority
             />
             <h3 className="text-lg font-semibold text-primary">মোহাম্মদ শেখ শাহিনুর রহমান</h3>
-            <p className="text-xs text-foreground/80 mt-1 mb-3 px-2">
-              কবি | লেখক | সফটওয়্যার ইঞ্জিনিয়ার | প্রোগ্রামার <br/> ডিজিটাল ফরেনসিক বিশেষজ্ঞ | প্রযুক্তি উদ্ভাবক
-            </p>
-            <div className="mt-3 space-y-1">
+            <div className="text-sm text-foreground/80 mt-2 mb-4 px-2 space-y-1">
+              <p>কবি | লেখক</p>
+              <p>সফটওয়্যার ইঞ্জিনিয়ার | প্রোগ্রামার</p>
+              <p>ডিজিটাল ফরেনসিক বিশেষজ্ঞ</p>
+              <p>প্রযুক্তি উদ্ভাবক</p>
+            </div>
+            <div className="mt-3 space-y-2">
               <p className="text-sm font-medium text-foreground/90 mb-1">আরও জানুন:</p>
               <a 
                 href="https://mohammad-sheikh-shahinur-rahman.vercel.app/" 
@@ -85,8 +91,9 @@ const LandingPageClient = () => {
         </Card>
       </div>
 
-       <footer className="relative mt-12 mb-6 text-center w-full text-muted-foreground text-sm">
-        <p>&copy; {new Date().getFullYear()} AI Quiz BD Lite. সর্বস্বত্ব সংরক্ষিত।</p>
+       <footer className="relative mt-12 mb-6 text-center w-full text-muted-foreground text-xs sm:text-sm">
+        <p>এই অ্যাপটি তৈরি করেছেন <span className="font-semibold text-foreground/90">মোহাম্মদ শেখ শাহিনুর রহমান</span>।</p>
+        <p>&copy; {new Date().getFullYear()} সর্বস্বত্ব সংরক্ষিত।</p>
       </footer>
     </div>
   );
