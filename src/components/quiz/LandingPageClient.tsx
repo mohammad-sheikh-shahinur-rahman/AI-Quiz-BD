@@ -13,7 +13,6 @@ const LandingPageClient = () => {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    // Trigger animation
     const timer = setTimeout(() => setIsVisible(true), 100);
     return () => clearTimeout(timer);
   }, []);
@@ -36,7 +35,7 @@ const LandingPageClient = () => {
         </p>
         <Button
           size="lg"
-          className="animate-pulse-once font-semibold text-lg px-8 py-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow transform hover:scale-105"
+          className="animate-fade-in-up animate-pulse-once font-semibold text-lg px-8 py-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow transform hover:scale-105"
           onClick={handleStartQuiz}
           aria-label="কুইজ শুরু করুন"
           style={{ animationDelay: '600ms' }}
@@ -59,3 +58,4 @@ const LandingPageClient = () => {
 };
 
 export default LandingPageClient;
+

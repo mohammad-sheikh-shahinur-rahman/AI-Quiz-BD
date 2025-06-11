@@ -25,7 +25,7 @@ import {
   RANDOM_TOPIC_VALUE
 } from '@/constants/quiz';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { AlertCircle, CheckCircle2, XCircle, ChevronRight, RotateCcw } from 'lucide-react';
+import { CheckCircle2, XCircle, ChevronRight, RotateCcw } from 'lucide-react';
 
 const QuizInterface = () => {
   const router = useRouter();
@@ -260,13 +260,13 @@ const QuizInterface = () => {
         }
         return newState;
       });
+      // Question will be fetched by useEffect
     }
   };
   
   const handleRestartQuiz = () => {
      if (typeof window !== 'undefined') {
-      localStorage.removeItem(QUIZ_STORAGE_KEY); // Clear current quiz state
-      // User name and selected topic are preserved for convenience if they want to start with same settings
+      localStorage.removeItem(QUIZ_STORAGE_KEY); 
     }
     router.push('/start');
   };
@@ -391,3 +391,4 @@ const QuizInterface = () => {
 };
 
 export default QuizInterface;
+

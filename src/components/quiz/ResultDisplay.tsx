@@ -79,6 +79,8 @@ const ResultDisplay = () => {
           }
         } else if (error instanceof Error) {
           toastDescription = `শেয়ার করতে সমস্যা হয়েছে: ${error.message}`;
+        } else {
+           console.error("Unexpected error type during share:", error);
         }
         
         toast({ title: toastTitle, description: toastDescription, variant: "destructive" });
@@ -126,7 +128,7 @@ const ResultDisplay = () => {
               আপনি <span className="font-semibold text-primary">{TOTAL_QUESTIONS}</span> টি প্রশ্নের মধ্যে <span className="font-semibold text-primary">{quizState.quizHistory.filter(h => h.isCorrect).length}</span> টির সঠিক উত্তর দিয়েছেন। ({percentageScore.toFixed(0)}%)
             </div>
 
-            <div className="p-4 border rounded-lg bg-muted/50 min-h-[80px] flex items-center justify-center">
+            <div className="p-4 border rounded-lg bg-muted/50 min-h-[80px] flex items-center justify-center animate-fade-in-up" style={{ animationDelay: '300ms' }}>
               {isLoadingComment ? (
                 <LoadingSpinner size="sm" />
               ) : (
@@ -141,7 +143,7 @@ const ResultDisplay = () => {
             <ScrollArea className="max-h-72 w-full pr-3">
               <div className="space-y-3 text-left">
                 {quizState.quizHistory.map((item, index) => (
-                  <details key={index} className="p-0 border-0 rounded-md overflow-hidden">
+                  <details key={index} className="p-0 border-0 rounded-md overflow-hidden animate-fade-in-up" style={{ animationDelay: `${500 + index * 100}ms` }}>
                     <summary className="cursor-pointer font-medium text-foreground/90 hover:bg-muted/70 dark:hover:bg-muted/30 p-3 flex justify-between items-center rounded-md border bg-card hover:border-primary/50 transition-all">
                       <span className="truncate max-w-[80%]">প্রশ্ন {index + 1}: {item.questionText.substring(0,50)}{item.questionText.length > 50 ? '...' : ''}</span>
                       {item.isCorrect ? <CheckCircle2 className="text-green-500 ml-2 h-5 w-5 flex-shrink-0"/> : <XCircle className="text-red-500 ml-2 h-5 w-5 flex-shrink-0"/>}
@@ -175,3 +177,4 @@ const ResultDisplay = () => {
 };
 
 export default ResultDisplay;
+
