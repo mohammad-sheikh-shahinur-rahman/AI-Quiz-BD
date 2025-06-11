@@ -1,3 +1,9 @@
+import LandingPageClient from '@/components/quiz/LandingPageClient';
+
 export default function Home() {
-  return <></>;
+  return (
+    <main>
+      <LandingPageClient />
+    </main>
+  );
 }
