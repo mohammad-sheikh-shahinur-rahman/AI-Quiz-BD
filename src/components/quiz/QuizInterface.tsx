@@ -250,6 +250,8 @@ const QuizInterface = () => {
 
   const handleNext = () => {
     if (!quizState || isLoadingQuestion) return; // Guard against multiple clicks while loading
+     // Set loading true immediately to prevent useEffect conflicts and show spinner
+    setIsLoadingQuestion(true); 
 
     const nextQuestionNumber = quizState.currentQuestionNumber + 1;
 
@@ -264,9 +266,6 @@ const QuizInterface = () => {
       });
       router.push('/result');
     } else {
-      // Set loading true immediately to prevent useEffect conflicts and show spinner
-      setIsLoadingQuestion(true); 
-      
       setQuizState(prevState => {
         if (!prevState) return null; 
         const newState = {
@@ -278,6 +277,7 @@ const QuizInterface = () => {
         }
         
         const previouslyAsked = newState.quizHistory.map(h => h.questionText);
+        // Directly call fetchNewQuestion instead of relying on useEffect after state update
         fetchNewQuestion(newState.quizTopic, previouslyAsked);
         
         return newState;
@@ -325,7 +325,12 @@ const QuizInterface = () => {
         </CardHeader>
 
         <CardContent className="min-h-[300px]">
-          {isLoadingQuestion && <div className="flex items-center justify-center h-full"><LoadingSpinner size="lg" /></div>}
+          {isLoadingQuestion && (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <LoadingSpinner size="lg" />
+              <p className="mt-4 text-lg text-foreground/80">প্রশ্ন তৈরি হচ্ছে...</p>
+            </div>
+          )}
           
           {!isLoadingQuestion && currentQuestionData && (
             <div className="space-y-4 animate-fade-in-up">
