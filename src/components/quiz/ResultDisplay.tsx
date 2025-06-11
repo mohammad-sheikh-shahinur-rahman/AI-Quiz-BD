@@ -83,7 +83,19 @@ const ResultDisplay = () => {
         })
         .catch(error => {
           console.error("Failed to generate result image:", error);
-          toast({ title: "ছবি তৈরি ত্রুটি", description: "ফলাফলের ছবি তৈরি করা যায়নি।", variant: "destructive" });
+          let description = "ফলাফলের ছবি তৈরি করা যায়নি।";
+          if (error instanceof Error) {
+            if (error.message.includes("503") || error.message.toLowerCase().includes("overloaded") || error.message.toLowerCase().includes("service unavailable")) {
+              description = "ফলাফলের ছবি এই মুহূর্তে তৈরি করা যাচ্ছে না কারণ মডেলটি ব্যস্ত আছে। অনুগ্রহ করে কিছুক্ষণ পরে আবার চেষ্টা করুন।";
+            } else if (error.message.toLowerCase().includes("blocked") || error.message.toLowerCase().includes("safety settings")) {
+              description = "নিরাপত্তা নীতিমালার কারণে ফলাফলের ছবিটি তৈরি করা সম্ভব হয়নি।";
+            }
+          }
+          toast({ 
+            title: "ছবি তৈরি ত্রুটি", 
+            description: description, 
+            variant: "destructive" 
+          });
         })
         .finally(() => setIsLoadingImage(false));
     }
@@ -121,7 +133,6 @@ const ResultDisplay = () => {
 
         if (error instanceof DOMException) {
           if (error.name === 'AbortError') {
-            // User cancelled the share operation, or no app available. No need for an error toast.
             return;
           } else if (error.name === 'NotAllowedError') {
             toastDescription = "শেয়ার করার অনুমতি দেওয়া হয়নি। অনুগ্রহ করে ব্রাউজার সেটিংস পরীক্ষা করুন।";
@@ -132,7 +143,6 @@ const ResultDisplay = () => {
            toastDescription = `শেয়ার করতে সমস্যা: ${error.message}`;
         }
         
-        // If file sharing failed or wasn't attempted, try text-only clipboard copy
         if (!imageFile || (error instanceof DOMException && error.name !== 'AbortError')) {
             try {
                 await navigator.clipboard.writeText(`${shareTitle}\n${shareText}\n${shareUrl}`);
@@ -144,7 +154,7 @@ const ResultDisplay = () => {
             toast({ title: toastTitle, description: toastDescription, variant: "destructive" });
         }
       }
-    } else if (navigator.clipboard) { // Fallback for browsers that don't support navigator.share
+    } else if (navigator.clipboard) { 
       try {
         await navigator.clipboard.writeText(`${shareTitle}\n${shareText}\n${shareUrl}`);
         toast({ title: "কপি সফল", description: "ফলাফল ক্লিপবোর্ডে কপি করা হয়েছে!" });
@@ -201,7 +211,7 @@ const ResultDisplay = () => {
                   src={resultImageDataUri} 
                   alt={`ফলাফলের ছবি - ${quizState.userName}`} 
                   width={500} 
-                  height={281} // Assuming a 16:9 aspect ratio, adjust as needed
+                  height={281} 
                   className="rounded-md mx-auto shadow-md"
                   priority
                 />
