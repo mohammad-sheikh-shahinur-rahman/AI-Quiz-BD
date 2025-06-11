@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { USER_NAME_STORAGE_KEY, QUIZ_STORAGE_KEY } from '@/constants/quiz';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { USER_NAME_STORAGE_KEY, QUIZ_STORAGE_KEY, QUIZ_TOPICS, DEFAULT_QUIZ_TOPIC, SELECTED_QUIZ_TOPIC_STORAGE_KEY } from '@/constants/quiz';
 import { useToast } from "@/hooks/use-toast";
 
 const NameEntryForm = () => {
   const [name, setName] = useState('');
+  const [selectedTopic, setSelectedTopic] = useState<string>(DEFAULT_QUIZ_TOPIC);
   const router = useRouter();
   const { toast } = useToast();
   const [isVisible, setIsVisible] = useState(false);
@@ -37,6 +39,7 @@ const NameEntryForm = () => {
     }
     if (typeof window !== 'undefined') {
       localStorage.setItem(USER_NAME_STORAGE_KEY, name.trim());
+      localStorage.setItem(SELECTED_QUIZ_TOPIC_STORAGE_KEY, selectedTopic);
     }
     router.push('/quiz');
   };
@@ -51,7 +54,7 @@ const NameEntryForm = () => {
           <CardHeader>
             <CardTitle className="text-2xl font-headline text-center text-primary">কুইজে স্বাগতম!</CardTitle>
             <CardDescription className="text-center">
-              কুইজ শুরু করার জন্য আপনার নাম লিখুন।
+              কুইজ শুরু করার জন্য আপনার নাম ও বিষয় নির্বাচন করুন।
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -67,6 +70,21 @@ const NameEntryForm = () => {
                   required
                   className="text-lg"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quiz-topic" className="text-foreground/90 font-medium">কুইজের বিষয় নির্বাচন করুন</Label>
+                <Select value={selectedTopic} onValueChange={setSelectedTopic}>
+                  <SelectTrigger id="quiz-topic" className="w-full text-lg">
+                    <SelectValue placeholder="বিষয় নির্বাচন করুন" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {QUIZ_TOPICS.map(topic => (
+                      <SelectItem key={topic.value} value={topic.value} className="text-lg">
+                        {topic.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <Button type="submit" className="w-full text-lg py-3 font-semibold rounded-lg shadow-md hover:shadow-lg transition-shadow transform hover:scale-105">
                 কুইজ শুরু করুন

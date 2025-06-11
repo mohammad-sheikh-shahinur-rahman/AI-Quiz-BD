@@ -12,7 +12,15 @@ import LoadingSpinner from './LoadingSpinner';
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import type { QuizState, QuizHistoryEntry } from '@/types/quiz';
-import { TOTAL_QUESTIONS, QUESTION_TIMER_SECONDS, POINTS_PER_CORRECT_ANSWER, QUIZ_STORAGE_KEY, USER_NAME_STORAGE_KEY } from '@/constants/quiz';
+import { 
+  TOTAL_QUESTIONS, 
+  QUESTION_TIMER_SECONDS, 
+  POINTS_PER_CORRECT_ANSWER, 
+  QUIZ_STORAGE_KEY, 
+  USER_NAME_STORAGE_KEY,
+  SELECTED_QUIZ_TOPIC_STORAGE_KEY,
+  DEFAULT_QUIZ_TOPIC
+} from '@/constants/quiz';
 import { AlertCircle, CheckCircle2, XCircle, ChevronRight, RotateCcw } from 'lucide-react';
 
 const QuizInterface = () => {
@@ -40,19 +48,28 @@ const QuizInterface = () => {
       const storedState = localStorage.getItem(QUIZ_STORAGE_KEY);
       if (storedState) {
         const parsedState: QuizState = JSON.parse(storedState);
-        // Basic validation, could be more thorough
-        if (parsedState.userName === storedName && parsedState.currentQuestionNumber <= TOTAL_QUESTIONS) {
+        // Basic validation for resuming a quiz
+        if (
+            parsedState.userName === storedName && 
+            parsedState.currentQuestionNumber > 0 &&
+            parsedState.currentQuestionNumber <= TOTAL_QUESTIONS &&
+            parsedState.quizHistory.length === parsedState.currentQuestionNumber - 1
+        ) {
            setQuizState(parsedState);
            return;
+        } else {
+          // Invalid or mismatched/completed state, clear it to start fresh for this user
+          localStorage.removeItem(QUIZ_STORAGE_KEY);
         }
       }
       // Initialize new quiz state
+      const initialTopic = localStorage.getItem(SELECTED_QUIZ_TOPIC_STORAGE_KEY) || DEFAULT_QUIZ_TOPIC;
       setQuizState({
         userName: storedName,
         currentQuestionNumber: 1,
         totalScore: 0,
         quizHistory: [],
-        quizTopic: "সাধারণ জ্ঞান" 
+        quizTopic: initialTopic 
       });
     }
   }, [router]);
@@ -77,7 +94,6 @@ const QuizInterface = () => {
         description: "প্রশ্ন আনতে ব্যর্থ। অনুগ্রহ করে আবার চেষ্টা করুন।",
         variant: "destructive",
       });
-      // Potentially offer a retry mechanism or navigate away
     } finally {
       setIsLoadingQuestion(false);
     }
@@ -85,8 +101,6 @@ const QuizInterface = () => {
 
   useEffect(() => {
     if (quizState && quizState.currentQuestionNumber <= TOTAL_QUESTIONS && !currentQuestionData && !isLoadingQuestion) {
-       // If we have a quiz state, are within question limits, but no current question data is loaded (and not already loading), fetch one.
-       // This handles initial load or resuming a quiz.
       fetchNewQuestion(quizState.quizTopic);
     }
   }, [quizState, currentQuestionData, isLoadingQuestion, fetchNewQuestion]);
@@ -100,16 +114,10 @@ const QuizInterface = () => {
     return () => clearInterval(intervalId);
   }, [timerActive, timeLeft, currentQuestionData]);
 
-  useEffect(() => {
-    if (timeLeft === 0 && timerActive && currentQuestionData) {
-      setTimerActive(false);
-      handleTimeUp();
-    }
-  }, [timeLeft, timerActive, currentQuestionData]); // handleTimeUp needs to be stable or wrapped in useCallback if passed as dep
-
   const handleTimeUp = useCallback(() => {
-    if (!quizState || !currentQuestionData) return;
+    if (!quizState || !currentQuestionData || feedback) return; // Ensure not to process if feedback already set (e.g. by submit)
     
+    setTimerActive(false);
     setFeedback({ message: "সময় শেষ! এই প্রশ্নের জন্য কোন পয়েন্ট নেই।", isCorrect: false });
     
     const historyEntry: QuizHistoryEntry = {
@@ -118,7 +126,7 @@ const QuizInterface = () => {
       userSelectedAnswer: null,
       correctAnswerText: currentQuestionData.correctAnswer,
       isCorrect: false,
-      aiFeedback: "সময় শেষ!",
+      aiFeedback: "সময় শেষ! সঠিক উত্তর ছিল: " + currentQuestionData.correctAnswer,
       pointsAwarded: 0,
     };
 
@@ -133,7 +141,13 @@ const QuizInterface = () => {
       }
       return newState;
     });
-  }, [quizState, currentQuestionData]);
+  }, [quizState, currentQuestionData, feedback]);
+
+  useEffect(() => {
+    if (timeLeft === 0 && timerActive && currentQuestionData && !feedback) {
+      handleTimeUp();
+    }
+  }, [timeLeft, timerActive, currentQuestionData, feedback, handleTimeUp]);
 
 
   const handleSubmitAnswer = async () => {
@@ -192,17 +206,39 @@ const QuizInterface = () => {
   const handleNext = () => {
     if (!quizState) return;
 
-    if (quizState.currentQuestionNumber >= TOTAL_QUESTIONS) {
+    const nextQuestionNumber = quizState.currentQuestionNumber + 1;
+
+    if (nextQuestionNumber > TOTAL_QUESTIONS) {
+      // Update state to reflect quiz completion before redirecting
+      // This ensures result page has the final state even if localStorage update is slow
+      setQuizState(prevState => {
+        if (!prevState) return null;
+        const finalState = { ...prevState, currentQuestionNumber: nextQuestionNumber };
+         if (typeof window !== 'undefined') {
+            localStorage.setItem(QUIZ_STORAGE_KEY, JSON.stringify(finalState));
+        }
+        return finalState;
+      });
       router.push('/result');
     } else {
       setQuizState(prevState => {
         if (!prevState) return null;
-        const newState = { ...prevState, currentQuestionNumber: prevState.currentQuestionNumber + 1 };
-        // Don't save to localStorage here yet, fetchNewQuestion will trigger save after new question is loaded with its state
+        // The quizHistory for the *current* question has already been added by handleSubmit or handleTimeUp.
+        // We now prepare for the *next* question.
+        const newState = { ...prevState, currentQuestionNumber: nextQuestionNumber };
+        // localStorage will be updated by the effect that fetches the new question,
+        // or after quiz completion by the logic above.
+        // For robustness, we can save here too, to ensure currentQuestionNumber is updated
+        // if fetchNewQuestion fails or user navigates away before it completes.
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(QUIZ_STORAGE_KEY, JSON.stringify(newState));
+        }
         return newState;
       });
       setCurrentQuestionData(null); // Clear current question to trigger fetch in useEffect
-      // fetchNewQuestion will be called by useEffect due to currentQuestionData becoming null
+      setFeedback(null); // Clear feedback for the new question
+      setSelectedAnswer(null); // Clear selected answer
+      // fetchNewQuestion will be called by useEffect due to currentQuestionData becoming null and quizState change
     }
   };
   
@@ -217,7 +253,7 @@ const QuizInterface = () => {
     <div className="flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 bg-background">
       <Card className="w-full max-w-2xl shadow-2xl rounded-xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl sm:text-3xl font-headline text-primary">AI কুইজ চলছে...</CardTitle>
+          <CardTitle className="text-2xl sm:text-3xl font-headline text-primary">AI কুইজ - {quizState.quizTopic}</CardTitle>
           <CardDescription>প্রশ্ন নং: {quizState.currentQuestionNumber}/{TOTAL_QUESTIONS} | মোট স্কোর: {quizState.totalScore}</CardDescription>
           <Progress value={progressPercentage} className="w-full mt-2" />
           {currentQuestionData && !feedback && (
@@ -236,7 +272,7 @@ const QuizInterface = () => {
               <RadioGroup
                 value={selectedAnswer || ""}
                 onValueChange={(value) => !feedback && setSelectedAnswer(value)}
-                disabled={!!feedback || isEvaluating}
+                disabled={!!feedback || isEvaluating || isLoadingQuestion}
                 className="space-y-3"
               >
                 {currentQuestionData.options.map((option, index) => (
@@ -264,7 +300,7 @@ const QuizInterface = () => {
                 <h3 className={`text-lg font-semibold ${feedback.isCorrect ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>{feedback.message}</h3>
               </div>
               {feedback.aiEvaluation && <p className="text-sm text-foreground/80">{feedback.aiEvaluation}</p>}
-              {!feedback.aiEvaluation && feedback.message.includes("সময় শেষ") && <p className="text-sm text-foreground/80">{currentQuestionData?.correctAnswer ? `সঠিক উত্তর ছিল: ${currentQuestionData.correctAnswer}` : ''}</p>}
+              {!feedback.aiEvaluation && feedback.message.includes("সময় শেষ") && currentQuestionData && <p className="text-sm text-foreground/80">সঠিক উত্তর ছিল: {currentQuestionData.correctAnswer}</p>}
             </div>
           )}
         </CardContent>
