@@ -10,8 +10,9 @@ import LoadingSpinner from './LoadingSpinner';
 import { useToast } from "@/hooks/use-toast";
 import type { QuizState } from '@/types/quiz';
 import { QUIZ_STORAGE_KEY, USER_NAME_STORAGE_KEY, TOTAL_QUESTIONS, POINTS_PER_CORRECT_ANSWER } from '@/constants/quiz';
-import { Award, Share2, RotateCcw, MessageSquareHeart } from 'lucide-react';
+import { Award, Share2, RotateCcw, MessageSquareHeart, CheckCircle2, XCircle } from 'lucide-react';
 import Logo from './Logo';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const ResultDisplay = () => {
   const router = useRouter();
@@ -41,7 +42,7 @@ const ResultDisplay = () => {
         .then(commentData => setFinalComment(commentData.comment))
         .catch(error => {
           console.error("Failed to generate final comment:", error);
-          setFinalComment("আপনার প্রচেষ্টার জন্য ধন্যবাদ!"); // Fallback comment
+          setFinalComment("আপনার প্রচেষ্টার জন্য ধন্যবাদ!"); 
         })
         .finally(() => setIsLoadingComment(false));
     }
@@ -74,17 +75,10 @@ const ResultDisplay = () => {
               toastDescription = "শেয়ার করার অনুমতি দেওয়া হয়নি। অনুগ্রহ করে ব্রাউজার সেটিংস পরীক্ষা করুন।";
               break;
             default:
-              // Keep generic if DOMException name is not specifically handled
               toastDescription = `শেয়ার করতে সমস্যা হয়েছে: ${error.message || error.name}`;
-              console.error('Sharing DOMException:', error); 
           }
         } else if (error instanceof Error) {
-          // General Error instance
           toastDescription = `শেয়ার করতে সমস্যা হয়েছে: ${error.message}`;
-          console.error('Sharing Error:', error);
-        } else {
-          // Unknown error type
-          console.error('Unknown error during sharing:', error);
         }
         
         toast({ title: toastTitle, description: toastDescription, variant: "destructive" });
@@ -104,8 +98,6 @@ const ResultDisplay = () => {
   const handlePlayAgain = () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(QUIZ_STORAGE_KEY);
-      // Keep username for convenience or remove it too based on preference
-      // localStorage.removeItem(USER_NAME_STORAGE_KEY); 
     }
     router.push('/start');
   };
@@ -124,7 +116,7 @@ const ResultDisplay = () => {
           <CardHeader>
             <Award className="w-16 h-16 text-amber-500 mx-auto mb-4" />
             <CardTitle className="text-3xl sm:text-4xl font-headline text-primary">অভিনন্দন, {quizState.userName}!</CardTitle>
-            <CardDescription className="text-lg sm:text-xl">আপনার কুইজ সম্পন্ন হয়েছে।</CardDescription>
+            <CardDescription className="text-lg sm:text-xl text-foreground/80">আপনার কুইজ সম্পন্ন হয়েছে।</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="text-5xl sm:text-6xl font-bold text-accent">
@@ -145,22 +137,25 @@ const ResultDisplay = () => {
               )}
             </div>
             
-            <h3 className="text-xl font-semibold mt-6 mb-2 text-left text-primary">আপনার উত্তরসমূহ:</h3>
-            <div className="max-h-60 overflow-y-auto space-y-3 text-left pr-2">
-              {quizState.quizHistory.map((item, index) => (
-                <details key={index} className="p-3 border rounded-md bg-card/80">
-                  <summary className="cursor-pointer font-medium text-foreground/90 hover:text-primary">
-                    প্রশ্ন {index + 1}: {item.questionText.substring(0,50)}... 
-                    {item.isCorrect ? <span className="text-green-500 ml-2">(সঠিক)</span> : <span className="text-red-500 ml-2">(ভুল)</span>}
-                  </summary>
-                  <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                    <p><strong>আপনার উত্তর:</strong> {item.userSelectedAnswer || "উত্তর দেননি"}</p>
-                    {!item.isCorrect && <p><strong>সঠিক উত্তর:</strong> {item.correctAnswerText}</p>}
-                    <p><strong>AI ফিডব্যাক:</strong> {item.aiFeedback}</p>
-                  </div>
-                </details>
-              ))}
-            </div>
+            <h3 className="text-xl font-semibold mt-6 mb-3 text-left text-primary">আপনার উত্তরসমূহ বিস্তারিত:</h3>
+            <ScrollArea className="max-h-72 w-full pr-3">
+              <div className="space-y-3 text-left">
+                {quizState.quizHistory.map((item, index) => (
+                  <details key={index} className="p-0 border-0 rounded-md overflow-hidden">
+                    <summary className="cursor-pointer font-medium text-foreground/90 hover:bg-muted/70 dark:hover:bg-muted/30 p-3 flex justify-between items-center rounded-md border bg-card hover:border-primary/50 transition-all">
+                      <span className="truncate max-w-[80%]">প্রশ্ন {index + 1}: {item.questionText.substring(0,50)}{item.questionText.length > 50 ? '...' : ''}</span>
+                      {item.isCorrect ? <CheckCircle2 className="text-green-500 ml-2 h-5 w-5 flex-shrink-0"/> : <XCircle className="text-red-500 ml-2 h-5 w-5 flex-shrink-0"/>}
+                    </summary>
+                    <div className="mt-0 p-3 border border-t-0 rounded-b-md bg-muted/30 dark:bg-card/50 space-y-2 text-sm text-muted-foreground">
+                      <p><strong>আপনার উত্তর:</strong> <span className={item.isCorrect ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>{item.userSelectedAnswer || "উত্তর দেননি"}</span></p>
+                      {!item.isCorrect && <p><strong>সঠিক উত্তর:</strong> <span className="text-green-600 dark:text-green-400">{item.correctAnswerText}</span></p>}
+                      <p><strong>AI ফিডব্যাক:</strong> {item.aiFeedback}</p>
+                       <p><strong>পয়েন্ট:</strong> {item.pointsAwarded}</p>
+                    </div>
+                  </details>
+                ))}
+              </div>
+            </ScrollArea>
 
           </CardContent>
           <CardFooter className="flex flex-col sm:flex-row justify-center gap-4 pt-8">
