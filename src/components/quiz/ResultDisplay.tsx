@@ -1,18 +1,36 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { generateFinalComment } from '@/ai/flows/generate-final-comment';
+import { generateResultImage, type GenerateResultImageOutput } from '@/ai/flows/generate-result-image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import LoadingSpinner from './LoadingSpinner';
 import { useToast } from "@/hooks/use-toast";
 import type { QuizState } from '@/types/quiz';
-import { QUIZ_STORAGE_KEY, USER_NAME_STORAGE_KEY, TOTAL_QUESTIONS, POINTS_PER_CORRECT_ANSWER } from '@/constants/quiz';
-import { Award, Share2, RotateCcw, MessageSquareHeart, CheckCircle2, XCircle } from 'lucide-react';
+import { QUIZ_STORAGE_KEY, USER_NAME_STORAGE_KEY, TOTAL_QUESTIONS, POINTS_PER_CORRECT_ANSWER, QUIZ_TOPICS, DEFAULT_QUIZ_TOPIC } from '@/constants/quiz';
+import { Award, Share2, RotateCcw, MessageSquareHeart, CheckCircle2, XCircle, Image as ImageIcon, Download } from 'lucide-react';
 import Logo from './Logo';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import Image from 'next/image'; // Using next/image for optimized image display
+
+async function dataUriToImageFile(dataUri: string, fileName: string): Promise<File | null> {
+  try {
+    const response = await fetch(dataUri);
+    const blob = await response.blob();
+    if (!blob.type.startsWith('image/')) {
+      console.error("Fetched data is not an image blob:", blob.type);
+      return null; 
+    }
+    return new File([blob], fileName, { type: blob.type });
+  } catch (error) {
+    console.error("Error converting data URI to file:", error);
+    return null;
+  }
+}
+
 
 const ResultDisplay = () => {
   const router = useRouter();
@@ -21,7 +39,15 @@ const ResultDisplay = () => {
   const [quizState, setQuizState] = useState<QuizState | null>(null);
   const [finalComment, setFinalComment] = useState<string | null>(null);
   const [isLoadingComment, setIsLoadingComment] = useState(true);
+  const [resultImageDataUri, setResultImageDataUri] = useState<string | null>(null);
+  const [isLoadingImage, setIsLoadingImage] = useState(true);
   const [isVisible, setIsVisible] = useState(false);
+
+  const getQuizTopicLabel = useCallback((topicValue: string) => {
+    const topic = QUIZ_TOPICS.find(t => t.value === topicValue);
+    return topic ? topic.label : DEFAULT_QUIZ_TOPIC;
+  }, []);
+
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 100);
@@ -45,57 +71,91 @@ const ResultDisplay = () => {
           setFinalComment("আপনার প্রচেষ্টার জন্য ধন্যবাদ!"); 
         })
         .finally(() => setIsLoadingComment(false));
+
+      generateResultImage({ 
+        name: parsedState.userName || 'অংশগ্রহণকারী', 
+        score: parsedState.totalScore,
+        totalPossibleScore: TOTAL_QUESTIONS * POINTS_PER_CORRECT_ANSWER,
+        quizTopicLabel: getQuizTopicLabel(parsedState.quizTopic)
+      })
+        .then((imageOutput: GenerateResultImageOutput) => {
+          setResultImageDataUri(imageOutput.imageDataUri);
+        })
+        .catch(error => {
+          console.error("Failed to generate result image:", error);
+          toast({ title: "ছবি তৈরি ত্রুটি", description: "ফলাফলের ছবি তৈরি করা যায়নি।", variant: "destructive" });
+        })
+        .finally(() => setIsLoadingImage(false));
     }
     return () => clearTimeout(timer);
-  }, [router, toast]);
+  }, [router, toast, getQuizTopicLabel]);
 
   const handleShare = async () => {
     if (!quizState) return;
-    const shareText = `আমি AI কুইজ বাংলাদেশ-এ ${quizState.totalScore} স্কোর করেছি! আপনিও যোগ দিন।`;
+    const shareText = `আমি AI কুইজ বাংলাদেশ (${getQuizTopicLabel(quizState.quizTopic)})-এ ${quizState.totalScore} স্কোর করেছি! আপনিও যোগ দিন।`;
     const shareUrl = window.location.origin;
+    const shareTitle = `AI কুইজ বাংলাদেশ - ${quizState.userName}-এর স্কোর`;
+
+    let imageFile: File | null = null;
+    if (resultImageDataUri) {
+      imageFile = await dataUriToImageFile(resultImageDataUri, `AI_Quiz_BD_Result_${quizState.userName}.png`);
+    }
 
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: 'AI কুইজ বাংলাদেশ - আমার স্কোর',
+        const shareData: ShareData = {
+          title: shareTitle,
           text: shareText,
           url: shareUrl,
-        });
-        toast({ title: "সফল", description: "ফলাফল শেয়ার করা হয়েছে!" });
-      } catch (error) {
-        let toastTitle = "ত্রুটি";
-        let toastDescription = "শেয়ার করতে একটি অপ্রত্যাশিত সমস্যা হয়েছে।";
-
-        if (error instanceof DOMException) {
-          switch (error.name) {
-            case 'AbortError':
-              toastDescription = "শেয়ার করার প্রক্রিয়া বাতিল করা হয়েছে অথবা কোনো উপযুক্ত অ্যাপ পাওয়া যায়নি।";
-              break;
-            case 'NotAllowedError':
-              toastDescription = "শেয়ার করার অনুমতি দেওয়া হয়নি। অনুগ্রহ করে ব্রাউজার সেটিংস পরীক্ষা করুন।";
-              break;
-            default:
-              toastDescription = `শেয়ার করতে সমস্যা হয়েছে: ${error.message || error.name}`;
-          }
-        } else if (error instanceof Error) {
-          toastDescription = `শেয়ার করতে সমস্যা হয়েছে: ${error.message}`;
-        } else {
-           console.error("Unexpected error type during share:", error);
+        };
+        if (imageFile && navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+          shareData.files = [imageFile];
         }
         
-        toast({ title: toastTitle, description: toastDescription, variant: "destructive" });
-      }
-    } else if (navigator.clipboard) {
-      try {
-        await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
-        toast({ title: "সফল", description: "ফলাফল ক্লিপবোর্ডে কপি করা হয়েছে!" });
+        await navigator.share(shareData);
+        toast({ title: "সফল", description: "ফলাফল শেয়ার করা হয়েছে!" });
+
       } catch (error) {
-        toast({ title: "ত্রুটি", description: "ক্লিপবোর্ডে কপি করতে সমস্যা হয়েছে।", variant: "destructive" });
+        let toastTitle = "শেয়ার ত্রুটি";
+        let toastDescription = "ফলাফল শেয়ার করতে একটি সমস্যা হয়েছে।";
+
+        if (error instanceof DOMException) {
+          if (error.name === 'AbortError') {
+            // User cancelled the share operation, or no app available. No need for an error toast.
+            return;
+          } else if (error.name === 'NotAllowedError') {
+            toastDescription = "শেয়ার করার অনুমতি দেওয়া হয়নি। অনুগ্রহ করে ব্রাউজার সেটিংস পরীক্ষা করুন।";
+          } else {
+            toastDescription = `শেয়ার করতে সমস্যা: ${error.message || error.name}`;
+          }
+        } else if (error instanceof Error) {
+           toastDescription = `শেয়ার করতে সমস্যা: ${error.message}`;
+        }
+        
+        // If file sharing failed or wasn't attempted, try text-only clipboard copy
+        if (!imageFile || (error instanceof DOMException && error.name !== 'AbortError')) {
+            try {
+                await navigator.clipboard.writeText(`${shareTitle}\n${shareText}\n${shareUrl}`);
+                toast({ title: "কপি সফল", description: "ফলাফল ক্লিপবোর্ডে কপি করা হয়েছে! (ছবি শেয়ার করা যায়নি)", variant: "default" });
+            } catch (clipError) {
+                 toast({ title: toastTitle, description: toastDescription, variant: "destructive" });
+            }
+        } else if (error instanceof DOMException && error.name !== 'AbortError') {
+            toast({ title: toastTitle, description: toastDescription, variant: "destructive" });
+        }
+      }
+    } else if (navigator.clipboard) { // Fallback for browsers that don't support navigator.share
+      try {
+        await navigator.clipboard.writeText(`${shareTitle}\n${shareText}\n${shareUrl}`);
+        toast({ title: "কপি সফল", description: "ফলাফল ক্লিপবোর্ডে কপি করা হয়েছে!" });
+      } catch (error) {
+        toast({ title: "কপি ত্রুটি", description: "ক্লিপবোর্ডে কপি করতে সমস্যা হয়েছে।", variant: "destructive" });
       }
     } else {
-      toast({ title: "দুঃখিত", description: "আপনার ব্রাউজারে স্বয়ংক্রিয় শেয়ারিং সাপোর্ট করে না।", variant: "destructive" });
+      toast({ title: "দুঃখিত", description: "আপনার ব্রাউজার স্বয়ংক্রিয় শেয়ারিং অথবা ক্লিপবোর্ড কপি সাপোর্ট করে না।", variant: "destructive" });
     }
   };
+
 
   const handlePlayAgain = () => {
     if (typeof window !== 'undefined') {
@@ -118,7 +178,7 @@ const ResultDisplay = () => {
           <CardHeader>
             <Award className="w-16 h-16 text-amber-500 mx-auto mb-4" />
             <CardTitle className="text-3xl sm:text-4xl font-headline text-primary">অভিনন্দন, {quizState.userName}!</CardTitle>
-            <CardDescription className="text-lg sm:text-xl text-foreground/80">আপনার কুইজ সম্পন্ন হয়েছে।</CardDescription>
+            <CardDescription className="text-lg sm:text-xl text-foreground/80">আপনার কুইজ সম্পন্ন হয়েছে। বিষয়: {getQuizTopicLabel(quizState.quizTopic)}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="text-5xl sm:text-6xl font-bold text-accent">
@@ -127,6 +187,40 @@ const ResultDisplay = () => {
             <div className="text-lg text-foreground/80">
               আপনি <span className="font-semibold text-primary">{TOTAL_QUESTIONS}</span> টি প্রশ্নের মধ্যে <span className="font-semibold text-primary">{quizState.quizHistory.filter(h => h.isCorrect).length}</span> টির সঠিক উত্তর দিয়েছেন। ({percentageScore.toFixed(0)}%)
             </div>
+
+            {isLoadingImage && (
+              <div className="p-4 border rounded-lg bg-muted/50 min-h-[150px] flex flex-col items-center justify-center animate-pulse">
+                <ImageIcon className="w-10 h-10 text-muted-foreground mb-2" />
+                <p className="text-muted-foreground">ফলাফলের ছবি তৈরি করা হচ্ছে...</p>
+                <LoadingSpinner size="sm" className="mt-2"/>
+              </div>
+            )}
+            {!isLoadingImage && resultImageDataUri && (
+              <div className="p-2 border rounded-lg bg-muted/50 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+                <Image 
+                  src={resultImageDataUri} 
+                  alt={`ফলাফলের ছবি - ${quizState.userName}`} 
+                  width={500} 
+                  height={281} // Assuming a 16:9 aspect ratio, adjust as needed
+                  className="rounded-md mx-auto shadow-md"
+                  priority
+                />
+                 <a 
+                  href={resultImageDataUri} 
+                  download={`AI_Quiz_BD_Result_${quizState.userName}.png`}
+                  className="mt-2 inline-flex items-center text-sm text-accent hover:underline"
+                >
+                  <Download className="mr-1.5 h-4 w-4" />
+                  ছবি ডাউনলোড করুন
+                </a>
+              </div>
+            )}
+             {!isLoadingImage && !resultImageDataUri && (
+                <div className="p-4 border border-destructive/50 rounded-lg bg-destructive/10 min-h-[80px] flex items-center justify-center">
+                     <p className="text-sm text-destructive">ফলাফলের ছবি তৈরি করা যায়নি।</p>
+                </div>
+            )}
+
 
             <div className="p-4 border rounded-lg bg-muted/50 min-h-[80px] flex items-center justify-center animate-fade-in-up" style={{ animationDelay: '300ms' }}>
               {isLoadingComment ? (
