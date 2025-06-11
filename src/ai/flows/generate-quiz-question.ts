@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -13,6 +14,7 @@ import {z} from 'genkit';
 
 const GenerateQuizQuestionInputSchema = z.object({
   topic: z.string().describe('The topic of the quiz question.'),
+  previouslyAskedQuestions: z.array(z.string()).optional().describe('A list of questions already asked in this session, to avoid repetition.'),
 });
 export type GenerateQuizQuestionInput = z.infer<typeof GenerateQuizQuestionInputSchema>;
 
@@ -32,10 +34,20 @@ const generateQuizQuestionPrompt = ai.definePrompt({
   model: 'googleai/gemini-1.5-flash-latest',
   input: {schema: GenerateQuizQuestionInputSchema},
   output: {schema: GenerateQuizQuestionOutputSchema},
-  prompt: `বাংলা ভাষায় একটি কুইজ প্রশ্ন তৈরি করো। বিষয়: {{{topic}}}। প্রশ্নের সাথে ৪টি অপশন দাও এবং সঠিক উত্তরটি চিহ্নিত করো।\n\nOutput in JSON format:\n{
+  prompt: `বাংলা ভাষায় একটি কুইজ প্রশ্ন তৈরি করো। বিষয়: {{{topic}}}।
+{{#if previouslyAskedQuestions}}
+এই প্রশ্নগুলো ইতিমধ্যে জিজ্ঞাসা করা হয়েছে, অনুগ্রহ করে এগুলোর পুনরাবৃত্তি করবে না:
+{{#each previouslyAskedQuestions}}
+- {{{this}}}
+{{/each}}
+{{/if}}
+প্রশ্নের সাথে ৪টি অপশন দাও এবং সঠিক উত্তরটি চিহ্নিত করো। একটি নতুন এবং স্বতন্ত্র প্রশ্ন তৈরি করার চেষ্টা করবে।
+
+Output in JSON format:
+{
   "question": "question in bangla",
-    "options": ["option 1", "option 2", "option 3", "option 4"],
-    "correctAnswer": "the correct option"
+  "options": ["option 1", "option 2", "option 3", "option 4"],
+  "correctAnswer": "the correct option"
 }
 `,
 });

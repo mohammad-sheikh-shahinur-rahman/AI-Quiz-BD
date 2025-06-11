@@ -93,9 +93,11 @@ const QuizInterface = () => {
         topicForGeneration = DEFAULT_QUIZ_TOPIC; 
       }
     }
+    
+    const previouslyAsked = quizState?.quizHistory.map(h => h.questionText) || [];
 
     try {
-      const question = await generateQuizQuestion({ topic: topicForGeneration });
+      const question = await generateQuizQuestion({ topic: topicForGeneration, previouslyAskedQuestions: previouslyAsked });
       setCurrentQuestionData(question);
       setTimeLeft(QUESTION_TIMER_SECONDS);
       setTimerActive(true);
@@ -109,7 +111,7 @@ const QuizInterface = () => {
     } finally {
       setIsLoadingQuestion(false);
     }
-  }, [toast]);
+  }, [toast, quizState]);
 
   useEffect(() => {
     if (quizState && quizState.currentQuestionNumber <= TOTAL_QUESTIONS && !currentQuestionData && !isLoadingQuestion) {
