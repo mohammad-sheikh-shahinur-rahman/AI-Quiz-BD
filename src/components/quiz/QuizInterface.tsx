@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { generateQuizQuestion, type GenerateQuizQuestionOutput } from '@/ai/flows/generate-quiz-question';
 import { evaluateUserAnswer } from '@/ai/flows/evaluate-user-answer';
@@ -27,10 +27,14 @@ import {
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { CheckCircle2, XCircle, ChevronRight, RotateCcw } from 'lucide-react';
 
+type InitializationStatus = 'pending' | 'redirecting' | 'initialized';
+
 const QuizInterface = () => {
   const router = useRouter();
   const { toast } = useToast();
+  const isMountedRef = useRef(false);
 
+  const [initializationStatus, setInitializationStatus] = useState<InitializationStatus>('pending');
   const [quizState, setQuizState] = useState<QuizState | null>(null);
   const [currentQuestionData, setCurrentQuestionData] = useState<GenerateQuizQuestionOutput | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
@@ -42,32 +46,39 @@ const QuizInterface = () => {
   const [timerActive, setTimerActive] = useState(false);
   const [currentQuestionActualTopicLabel, setCurrentQuestionActualTopicLabel] = useState<string | null>(null);
 
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
-  const loadQuizState = useCallback(() => {
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       const storedName = localStorage.getItem(USER_NAME_STORAGE_KEY);
       if (!storedName) {
-        router.replace('/start');
+        setInitializationStatus('redirecting');
         return;
       }
       
       const storedState = localStorage.getItem(QUIZ_STORAGE_KEY);
       if (storedState) {
-        const parsedState: QuizState = JSON.parse(storedState);
-        if (
-            parsedState.userName === storedName && 
-            parsedState.currentQuestionNumber > 0 &&
-            // Allow continuation even if currentQuestionNumber > TOTAL_QUESTIONS (i.e. on result page then navigated back)
-            // The actual question fetching logic will handle TOTAL_QUESTIONS limit.
-            parsedState.quizHistory.length === parsedState.currentQuestionNumber - 1
-        ) {
-           setQuizState(parsedState);
-           // If quiz is already finished and user navigates back, don't auto-fetch.
-           // Let them use "Restart" or handle UI appropriately.
-           // The useEffect below will decide whether to fetch.
-           return;
-        } else {
-          localStorage.removeItem(QUIZ_STORAGE_KEY); // Clear inconsistent state
+        try {
+          const parsedState: QuizState = JSON.parse(storedState);
+          if (
+              parsedState.userName === storedName && 
+              parsedState.currentQuestionNumber > 0 &&
+              parsedState.quizHistory.length === parsedState.currentQuestionNumber - 1
+          ) {
+             setQuizState(parsedState);
+             setInitializationStatus('initialized');
+             return;
+          } else {
+            localStorage.removeItem(QUIZ_STORAGE_KEY); 
+          }
+        } catch (e) {
+          console.error("Failed to parse stored quiz state:", e);
+          localStorage.removeItem(QUIZ_STORAGE_KEY);
         }
       }
       const initialTopic = localStorage.getItem(SELECTED_QUIZ_TOPIC_STORAGE_KEY) || DEFAULT_QUIZ_TOPIC;
@@ -78,19 +89,26 @@ const QuizInterface = () => {
         quizHistory: [],
         quizTopic: initialTopic 
       });
+      setInitializationStatus('initialized');
     }
-  }, [router]);
+  }, []);
 
   useEffect(() => {
-    loadQuizState();
-  }, [loadQuizState]);
+    if (initializationStatus === 'redirecting') {
+      router.replace('/start');
+    }
+  }, [initializationStatus, router]);
 
   const fetchNewQuestion = useCallback(async (baseTopic: string, previouslyAsked: string[]) => {
+    if (!isMountedRef.current) return;
     setIsLoadingQuestion(true);
-    setFeedback(null);
-    setSelectedAnswer(null);
-    setCurrentQuestionData(null); 
-    setCurrentQuestionActualTopicLabel(null); 
+    
+    if (isMountedRef.current) {
+      setFeedback(null);
+      setSelectedAnswer(null);
+      // setCurrentQuestionData(null); // Cleared before setting new data
+      // setCurrentQuestionActualTopicLabel(null);
+    }
 
     let topicForGeneration = baseTopic;
     let actualTopicDisplayValue = "";
@@ -106,48 +124,59 @@ const QuizInterface = () => {
       actualTopicDisplayValue = QUIZ_TOPICS.find(t => t.value === chosenTopicValue)?.label || chosenTopicValue;
     } else {
       topicForGeneration = baseTopic;
-      actualTopicDisplayValue = QUIZ_TOPICS.find(t => t.value === baseTopic)?.label || baseTopic;
+      // actualTopicDisplayValue will be set from QUIZ_TOPICS.find or baseTopic itself if not found
     }
         
     try {
-      const question = await generateQuizQuestion({ topic: topicForGeneration, previouslyAskedQuestions: previouslyAsked });
-      setCurrentQuestionData(question);
-      if (baseTopic === RANDOM_TOPIC_VALUE) {
-        setCurrentQuestionActualTopicLabel(actualTopicDisplayValue);
+      if (isMountedRef.current) {
+         setCurrentQuestionData(null); 
+         setCurrentQuestionActualTopicLabel(null);
       }
-      setTimeLeft(QUESTION_TIMER_SECONDS);
-      setTimerActive(true);
+      const question = await generateQuizQuestion({ topic: topicForGeneration, previouslyAskedQuestions: previouslyAsked });
+      if (isMountedRef.current) {
+        setCurrentQuestionData(question);
+        if (baseTopic === RANDOM_TOPIC_VALUE) {
+          setCurrentQuestionActualTopicLabel(actualTopicDisplayValue);
+        } else {
+           const topicLabel = QUIZ_TOPICS.find(t => t.value === baseTopic)?.label || baseTopic;
+           setCurrentQuestionActualTopicLabel(topicLabel); // Set for non-random too if needed, or remove if covered by getQuizTopicLabel
+        }
+        setTimeLeft(QUESTION_TIMER_SECONDS);
+        setTimerActive(true);
+      }
     } catch (error) {
       console.error("Failed to fetch question:", error);
-      toast({
-        title: "প্রশ্ন আনতে সমস্যা",
-        description: "প্রশ্ন আনতে ব্যর্থ। অনুগ্রহ করে আবার চেষ্টা করুন।",
-        variant: "destructive",
-      });
-      // Potentially reset to allow another attempt or navigate away
+      if (isMountedRef.current) {
+        toast({
+          title: "প্রশ্ন আনতে সমস্যা",
+          description: "প্রশ্ন আনতে ব্যর্থ। অনুগ্রহ করে আবার চেষ্টা করুন।",
+          variant: "destructive",
+        });
+      }
     } finally {
-      setIsLoadingQuestion(false);
+      if (isMountedRef.current) {
+        setIsLoadingQuestion(false);
+      }
     }
-  }, [toast]);
+  }, [toast]); // Removed quizState from deps, pass topic directly
 
-  // useEffect for initial question load or continuation from localStorage
   useEffect(() => {
     if (
+      initializationStatus === 'initialized' &&
       quizState &&
       quizState.currentQuestionNumber <= TOTAL_QUESTIONS &&
-      !currentQuestionData && // No current question loaded
-      !isLoadingQuestion && // Not already loading
-      // Ensures we only auto-fetch if history matches expected state for this question number
+      !currentQuestionData &&
+      !isLoadingQuestion &&
       quizState.quizHistory.length === quizState.currentQuestionNumber - 1
     ) {
       const previouslyAsked = quizState.quizHistory.map(h => h.questionText);
       fetchNewQuestion(quizState.quizTopic, previouslyAsked);
     }
-  }, [quizState, currentQuestionData, isLoadingQuestion, fetchNewQuestion]);
+  }, [initializationStatus, quizState, currentQuestionData, isLoadingQuestion, fetchNewQuestion]);
 
 
   const handleTimeUp = useCallback(() => {
-    if (!quizState || !currentQuestionData || feedback) return; 
+    if (!isMountedRef.current || !quizState || !currentQuestionData || feedback) return; 
     
     setTimerActive(false);
     const correctAnswerText = currentQuestionData.correctAnswer;
@@ -183,7 +212,7 @@ const QuizInterface = () => {
   useEffect(() => {
     if (!timerActive || timeLeft <= 0 || !currentQuestionData) return;
     const intervalId = setInterval(() => {
-      setTimeLeft((prevTime) => prevTime - 1);
+      if(isMountedRef.current) setTimeLeft((prevTime) => prevTime - 1);
     }, 1000);
     return () => clearInterval(intervalId);
   }, [timerActive, timeLeft, currentQuestionData]);
@@ -196,7 +225,7 @@ const QuizInterface = () => {
 
 
   const handleSubmitAnswer = async () => {
-    if (!selectedAnswer || !currentQuestionData || !quizState) return;
+    if (!selectedAnswer || !currentQuestionData || !quizState || !isMountedRef.current) return;
 
     setTimerActive(false);
     setIsEvaluating(true);
@@ -213,13 +242,16 @@ const QuizInterface = () => {
       aiFeedbackText = evaluation.feedback;
     } catch (error) {
       console.error("Failed to evaluate answer:", error);
-      toast({
-        title: "মূল্যায়নে সমস্যা",
-        description: "উত্তর মূল্যায়ন করতে সমস্যা হয়েছে।",
-        variant: "destructive",
-      });
+      if (isMountedRef.current) {
+        toast({
+          title: "মূল্যায়নে সমস্যা",
+          description: "উত্তর মূল্যায়ন করতে সমস্যা হয়েছে।",
+          variant: "destructive",
+        });
+      }
     }
 
+    if (!isMountedRef.current) return;
     setFeedback({ message: isCorrect ? "সঠিক উত্তর!" : "ভুল উত্তর!", isCorrect, aiEvaluation: aiFeedbackText });
 
     const historyEntry: QuizHistoryEntry = {
@@ -244,13 +276,12 @@ const QuizInterface = () => {
       }
       return newState;
     });
-
-    setIsEvaluating(false);
+    
+    if(isMountedRef.current) setIsEvaluating(false);
   };
 
   const handleNext = () => {
-    if (!quizState || isLoadingQuestion) return; // Guard against multiple clicks while loading
-     // Set loading true immediately to prevent useEffect conflicts and show spinner
+    if (!quizState || isLoadingQuestion || !isMountedRef.current) return;
     setIsLoadingQuestion(true); 
 
     const nextQuestionNumber = quizState.currentQuestionNumber + 1;
@@ -277,7 +308,6 @@ const QuizInterface = () => {
         }
         
         const previouslyAsked = newState.quizHistory.map(h => h.questionText);
-        // Directly call fetchNewQuestion instead of relying on useEffect after state update
         fetchNewQuestion(newState.quizTopic, previouslyAsked);
         
         return newState;
@@ -292,13 +322,17 @@ const QuizInterface = () => {
     router.push('/start');
   };
 
-  if (!quizState) {
+  if (initializationStatus === 'pending' || initializationStatus === 'redirecting' || !quizState) {
     return <div className="flex items-center justify-center min-h-screen"><LoadingSpinner /></div>;
   }
 
   const getQuizTopicLabel = (topicValue: string) => {
     if (topicValue === RANDOM_TOPIC_VALUE) {
         return QUIZ_TOPICS.find(t => t.value === RANDOM_TOPIC_VALUE)?.label || "এলোমেলো বিষয়";
+    }
+    // For specific topics, use currentQuestionActualTopicLabel if available and matches, otherwise lookup
+    if (currentQuestionActualTopicLabel && quizState.quizTopic !== RANDOM_TOPIC_VALUE && quizState.quizTopic === topicValue) {
+        return currentQuestionActualTopicLabel;
     }
     const topicObject = QUIZ_TOPICS.find(t => t.value === topicValue);
     return topicObject ? topicObject.label : DEFAULT_QUIZ_TOPIC;
@@ -417,5 +451,3 @@ const QuizInterface = () => {
 };
 
 export default QuizInterface;
-
-    
