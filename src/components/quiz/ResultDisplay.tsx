@@ -62,15 +62,32 @@ const ResultDisplay = () => {
         });
         toast({ title: "সফল", description: "ফলাফল শেয়ার করা হয়েছে!" });
       } catch (error) {
-        console.error('Error sharing:', error);
-        let toastDescription = "শেয়ার করতে সমস্যা হয়েছে।";
-        if (error instanceof DOMException && error.name === 'NotAllowedError') {
-          toastDescription = "শেয়ার করার অনুমতি দেওয়া হয়নি। অনুগ্রহ করে আবার চেষ্টা করুন অথবা ব্রাউজার সেটিংস পরীক্ষা করুন।";
-        } else if (error instanceof Error && (error.message.includes('Permission denied') || error.message.includes('The request is not allowed'))) {
-          // Fallback check for common permission error messages
-          toastDescription = "শেয়ার করার অনুমতি দেওয়া হয়নি। অনুগ্রহ করে ব্রাউজার সেটিংস পরীক্ষা করুন।";
+        let toastTitle = "ত্রুটি";
+        let toastDescription = "শেয়ার করতে একটি অপ্রত্যাশিত সমস্যা হয়েছে।";
+
+        if (error instanceof DOMException) {
+          switch (error.name) {
+            case 'AbortError':
+              toastDescription = "শেয়ার করার প্রক্রিয়া বাতিল করা হয়েছে অথবা কোনো উপযুক্ত অ্যাপ পাওয়া যায়নি।";
+              break;
+            case 'NotAllowedError':
+              toastDescription = "শেয়ার করার অনুমতি দেওয়া হয়নি। অনুগ্রহ করে ব্রাউজার সেটিংস পরীক্ষা করুন।";
+              break;
+            default:
+              // Keep generic if DOMException name is not specifically handled
+              toastDescription = `শেয়ার করতে সমস্যা হয়েছে: ${error.message || error.name}`;
+              console.error('Sharing DOMException:', error); 
+          }
+        } else if (error instanceof Error) {
+          // General Error instance
+          toastDescription = `শেয়ার করতে সমস্যা হয়েছে: ${error.message}`;
+          console.error('Sharing Error:', error);
+        } else {
+          // Unknown error type
+          console.error('Unknown error during sharing:', error);
         }
-        toast({ title: "ত্রুটি", description: toastDescription, variant: "destructive" });
+        
+        toast({ title: toastTitle, description: toastDescription, variant: "destructive" });
       }
     } else if (navigator.clipboard) {
       try {
@@ -163,4 +180,3 @@ const ResultDisplay = () => {
 };
 
 export default ResultDisplay;
-
