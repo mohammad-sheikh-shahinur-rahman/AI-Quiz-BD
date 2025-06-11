@@ -35,10 +35,12 @@ const QuizInterface = () => {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ message: string; isCorrect: boolean; aiEvaluation?: string } | null>(null);
   
-  const [isLoadingQuestion, setIsLoadingQuestion] = useState(false);
+  const [isLoadingQuestion, setIsLoadingQuestion] = useState(false); // Default to false
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [timeLeft, setTimeLeft] = useState(QUESTION_TIMER_SECONDS);
   const [timerActive, setTimerActive] = useState(false);
+  const [currentQuestionActualTopicLabel, setCurrentQuestionActualTopicLabel] = useState<string | null>(null);
+
 
   const loadQuizState = useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -82,23 +84,34 @@ const QuizInterface = () => {
     setIsLoadingQuestion(true);
     setFeedback(null);
     setSelectedAnswer(null);
+    setCurrentQuestionData(null); // Clear previous question data
+    setCurrentQuestionActualTopicLabel(null); // Clear previous actual topic label
 
     let topicForGeneration = baseTopic;
+    let actualTopicDisplayValue = "";
+
     if (baseTopic === RANDOM_TOPIC_VALUE) {
       const eligibleTopics = QUIZ_TOPICS.filter(t => t.value !== RANDOM_TOPIC_VALUE);
+      let chosenTopicValue = DEFAULT_QUIZ_TOPIC; // Default if no other topics
       if (eligibleTopics.length > 0) {
         const randomIndex = Math.floor(Math.random() * eligibleTopics.length);
-        topicForGeneration = eligibleTopics[randomIndex].value;
-      } else {
-        topicForGeneration = DEFAULT_QUIZ_TOPIC; 
+        chosenTopicValue = eligibleTopics[randomIndex].value;
       }
+      topicForGeneration = chosenTopicValue;
+      actualTopicDisplayValue = QUIZ_TOPICS.find(t => t.value === chosenTopicValue)?.label || chosenTopicValue;
+    } else {
+      topicForGeneration = baseTopic;
+      actualTopicDisplayValue = QUIZ_TOPICS.find(t => t.value === baseTopic)?.label || baseTopic;
     }
-    
+        
     const previouslyAsked = quizState?.quizHistory.map(h => h.questionText) || [];
 
     try {
       const question = await generateQuizQuestion({ topic: topicForGeneration, previouslyAskedQuestions: previouslyAsked });
       setCurrentQuestionData(question);
+      if (baseTopic === RANDOM_TOPIC_VALUE) {
+        setCurrentQuestionActualTopicLabel(actualTopicDisplayValue);
+      }
       setTimeLeft(QUESTION_TIMER_SECONDS);
       setTimerActive(true);
     } catch (error) {
@@ -108,10 +121,11 @@ const QuizInterface = () => {
         description: "প্রশ্ন আনতে ব্যর্থ। অনুগ্রহ করে আবার চেষ্টা করুন।",
         variant: "destructive",
       });
+      // Potentially reset or allow retry
     } finally {
       setIsLoadingQuestion(false);
     }
-  }, [toast, quizState]);
+  }, [toast, quizState]); // quizState is needed for quizHistory
 
   useEffect(() => {
     if (quizState && quizState.currentQuestionNumber <= TOTAL_QUESTIONS && !currentQuestionData && !isLoadingQuestion) {
@@ -246,9 +260,10 @@ const QuizInterface = () => {
         }
         return newState;
       });
-      setCurrentQuestionData(null); 
-      setFeedback(null); 
-      setSelectedAnswer(null); 
+      // setCurrentQuestionData(null); // This will be handled by fetchNewQuestion
+      // setFeedback(null); 
+      // setSelectedAnswer(null); 
+      // setCurrentQuestionActualTopicLabel(null); // This will be handled by fetchNewQuestion
     }
   };
   
@@ -284,7 +299,12 @@ const QuizInterface = () => {
           {isLoadingQuestion && <div className="flex items-center justify-center h-full"><LoadingSpinner size="lg" /></div>}
           
           {!isLoadingQuestion && currentQuestionData && (
-            <div className="space-y-6 animate-fade-in-up">
+            <div className="space-y-4 animate-fade-in-up">
+              {quizState.quizTopic === RANDOM_TOPIC_VALUE && currentQuestionActualTopicLabel && !feedback && (
+                <p className="text-md text-center text-accent font-semibold">
+                  এবারের বিষয়: {currentQuestionActualTopicLabel}
+                </p>
+              )}
               <h2 className="text-xl sm:text-2xl font-semibold text-foreground leading-relaxed">{currentQuestionData.question}</h2>
               <RadioGroup
                 value={selectedAnswer || ""}
@@ -317,6 +337,9 @@ const QuizInterface = () => {
                 <h3 className={`text-lg font-semibold ${feedback.isCorrect ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>{feedback.message}</h3>
               </div>
               {feedback.aiEvaluation && <p className="text-sm text-foreground/80">{feedback.aiEvaluation}</p>}
+              {!feedback.isCorrect && currentQuestionData && (
+                <p className="text-sm text-foreground/80 mt-1"><strong>সঠিক উত্তর ছিল:</strong> {currentQuestionData.correctAnswer}</p>
+              )}
             </div>
           )}
         </CardContent>
@@ -344,3 +367,4 @@ const QuizInterface = () => {
 };
 
 export default QuizInterface;
+
