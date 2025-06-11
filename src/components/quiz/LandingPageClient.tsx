@@ -28,21 +28,25 @@ const LandingPageClient = () => {
         className={`transition-all duration-1000 ease-out ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
       >
         <Logo className="mb-8" />
-        <p className="font-headline text-xl sm:text-2xl text-foreground/80 mb-12 animate-fade-in-up animation-delay-300">
-          আপনার মেধা যাচাই করুন AI-এর চোখে!
+        <p 
+          className="font-headline text-xl sm:text-2xl text-foreground/80 mb-12 animate-fade-in-up"
+          style={{ animationDelay: '300ms' }}
+        >
+          আপনার মেধা যাচাই করুন <span className="font-semibold text-primary">AI-এর চোখে!</span>
         </p>
         <Button
           size="lg"
-          className="animate-pulse-once animation-delay-600 font-semibold text-lg px-8 py-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow transform hover:scale-105"
+          className="animate-pulse-once font-semibold text-lg px-8 py-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow transform hover:scale-105"
           onClick={handleStartQuiz}
           aria-label="কুইজ শুরু করুন"
+          style={{ animationDelay: '600ms' }}
         >
           কুইজ শুরু করুন
           <ArrowRight className="ml-2 h-5 w-5" />
         </Button>
       </div>
 
-       <footer className="relative mt-20 mb-6 text-center w-full text-muted-foreground text-xs sm:text-sm">
+       <footer className="border-t border-border/50 pt-8 mt-16 mb-6 text-center w-full text-muted-foreground text-xs sm:text-sm">
         <p>এই অ্যাপটি তৈরি করেছেন <span className="font-semibold text-foreground/90">মোহাম্মদ শেখ শাহিনুর রহমান</span>।</p>
         <Link href="/developer" className="inline-flex items-center text-accent hover:underline hover:text-accent/80 transition-colors mt-2">
           <Info className="mr-1.5 h-4 w-4" />
