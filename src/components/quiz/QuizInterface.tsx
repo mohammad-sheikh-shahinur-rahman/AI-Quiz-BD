@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -19,7 +20,9 @@ import {
   QUIZ_STORAGE_KEY, 
   USER_NAME_STORAGE_KEY,
   SELECTED_QUIZ_TOPIC_STORAGE_KEY,
-  DEFAULT_QUIZ_TOPIC
+  DEFAULT_QUIZ_TOPIC,
+  QUIZ_TOPICS,
+  RANDOM_TOPIC_VALUE
 } from '@/constants/quiz';
 import { AlertCircle, CheckCircle2, XCircle, ChevronRight, RotateCcw } from 'lucide-react';
 
@@ -48,7 +51,6 @@ const QuizInterface = () => {
       const storedState = localStorage.getItem(QUIZ_STORAGE_KEY);
       if (storedState) {
         const parsedState: QuizState = JSON.parse(storedState);
-        // Basic validation for resuming a quiz
         if (
             parsedState.userName === storedName && 
             parsedState.currentQuestionNumber > 0 &&
@@ -58,11 +60,9 @@ const QuizInterface = () => {
            setQuizState(parsedState);
            return;
         } else {
-          // Invalid or mismatched/completed state, clear it to start fresh for this user
           localStorage.removeItem(QUIZ_STORAGE_KEY);
         }
       }
-      // Initialize new quiz state
       const initialTopic = localStorage.getItem(SELECTED_QUIZ_TOPIC_STORAGE_KEY) || DEFAULT_QUIZ_TOPIC;
       setQuizState({
         userName: storedName,
@@ -78,12 +78,24 @@ const QuizInterface = () => {
     loadQuizState();
   }, [loadQuizState]);
 
-  const fetchNewQuestion = useCallback(async (topic: string) => {
+  const fetchNewQuestion = useCallback(async (baseTopic: string) => {
     setIsLoadingQuestion(true);
     setFeedback(null);
     setSelectedAnswer(null);
+
+    let topicForGeneration = baseTopic;
+    if (baseTopic === RANDOM_TOPIC_VALUE) {
+      const eligibleTopics = QUIZ_TOPICS.filter(t => t.value !== RANDOM_TOPIC_VALUE);
+      if (eligibleTopics.length > 0) {
+        const randomIndex = Math.floor(Math.random() * eligibleTopics.length);
+        topicForGeneration = eligibleTopics[randomIndex].value;
+      } else {
+        topicForGeneration = DEFAULT_QUIZ_TOPIC; // Fallback
+      }
+    }
+
     try {
-      const question = await generateQuizQuestion({ topic });
+      const question = await generateQuizQuestion({ topic: topicForGeneration });
       setCurrentQuestionData(question);
       setTimeLeft(QUESTION_TIMER_SECONDS);
       setTimerActive(true);
@@ -115,7 +127,7 @@ const QuizInterface = () => {
   }, [timerActive, timeLeft, currentQuestionData]);
 
   const handleTimeUp = useCallback(() => {
-    if (!quizState || !currentQuestionData || feedback) return; // Ensure not to process if feedback already set (e.g. by submit)
+    if (!quizState || !currentQuestionData || feedback) return; 
     
     setTimerActive(false);
     setFeedback({ message: "সময় শেষ! এই প্রশ্নের জন্য কোন পয়েন্ট নেই।", isCorrect: false });
@@ -209,8 +221,6 @@ const QuizInterface = () => {
     const nextQuestionNumber = quizState.currentQuestionNumber + 1;
 
     if (nextQuestionNumber > TOTAL_QUESTIONS) {
-      // Update state to reflect quiz completion before redirecting
-      // This ensures result page has the final state even if localStorage update is slow
       setQuizState(prevState => {
         if (!prevState) return null;
         const finalState = { ...prevState, currentQuestionNumber: nextQuestionNumber };
@@ -223,22 +233,15 @@ const QuizInterface = () => {
     } else {
       setQuizState(prevState => {
         if (!prevState) return null;
-        // The quizHistory for the *current* question has already been added by handleSubmit or handleTimeUp.
-        // We now prepare for the *next* question.
         const newState = { ...prevState, currentQuestionNumber: nextQuestionNumber };
-        // localStorage will be updated by the effect that fetches the new question,
-        // or after quiz completion by the logic above.
-        // For robustness, we can save here too, to ensure currentQuestionNumber is updated
-        // if fetchNewQuestion fails or user navigates away before it completes.
         if (typeof window !== 'undefined') {
             localStorage.setItem(QUIZ_STORAGE_KEY, JSON.stringify(newState));
         }
         return newState;
       });
-      setCurrentQuestionData(null); // Clear current question to trigger fetch in useEffect
-      setFeedback(null); // Clear feedback for the new question
-      setSelectedAnswer(null); // Clear selected answer
-      // fetchNewQuestion will be called by useEffect due to currentQuestionData becoming null and quizState change
+      setCurrentQuestionData(null); 
+      setFeedback(null); 
+      setSelectedAnswer(null); 
     }
   };
   
@@ -246,6 +249,10 @@ const QuizInterface = () => {
     return <div className="flex items-center justify-center min-h-screen"><LoadingSpinner /></div>;
   }
 
+  const getQuizTopicLabel = (topicValue: string) => {
+    const topicObject = QUIZ_TOPICS.find(t => t.value === topicValue);
+    return topicObject ? topicObject.label : DEFAULT_QUIZ_TOPIC;
+  };
 
   const progressPercentage = (quizState.currentQuestionNumber / TOTAL_QUESTIONS) * 100;
 
@@ -253,7 +260,7 @@ const QuizInterface = () => {
     <div className="flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 bg-background">
       <Card className="w-full max-w-2xl shadow-2xl rounded-xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl sm:text-3xl font-headline text-primary">AI কুইজ - {quizState.quizTopic}</CardTitle>
+          <CardTitle className="text-2xl sm:text-3xl font-headline text-primary">AI কুইজ - {getQuizTopicLabel(quizState.quizTopic)}</CardTitle>
           <CardDescription>প্রশ্ন নং: {quizState.currentQuestionNumber}/{TOTAL_QUESTIONS} | মোট স্কোর: {quizState.totalScore}</CardDescription>
           <Progress value={progressPercentage} className="w-full mt-2" />
           {currentQuestionData && !feedback && (
