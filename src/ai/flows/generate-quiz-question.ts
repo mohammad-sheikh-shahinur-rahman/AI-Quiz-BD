@@ -29,6 +29,7 @@ export async function generateQuizQuestion(input: GenerateQuizQuestionInput): Pr
 
 const generateQuizQuestionPrompt = ai.definePrompt({
   name: 'generateQuizQuestionPrompt',
+  model: 'googleai/gemini-1.5-flash-latest',
   input: {schema: GenerateQuizQuestionInputSchema},
   output: {schema: GenerateQuizQuestionOutputSchema},
   prompt: `বাংলা ভাষায় একটি কুইজ প্রশ্ন তৈরি করো। বিষয়: {{{topic}}}। প্রশ্নের সাথে ৪টি অপশন দাও এবং সঠিক উত্তরটি চিহ্নিত করো।\n\nOutput in JSON format:\n{
@@ -47,6 +48,10 @@ const generateQuizQuestionFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await generateQuizQuestionPrompt(input);
-    return output!;
+    if (!output) {
+      console.error(`[${generateQuizQuestionPrompt.name}] did not return a valid output for input:`, input);
+      throw new Error('AI failed to generate a quiz question.');
+    }
+    return output;
   }
 );

@@ -34,9 +34,10 @@ export async function evaluateUserAnswer(input: EvaluateUserAnswerInput): Promis
 
 const evaluateUserAnswerPrompt = ai.definePrompt({
   name: 'evaluateUserAnswerPrompt',
+  model: 'googleai/gemini-1.5-flash-latest',
   input: {schema: EvaluateUserAnswerInputSchema},
   output: {schema: EvaluateUserAnswerOutputSchema},
-  prompt: `ব্যবহারকারীর উত্তর: "{{userAnswer}}"\n\nসঠিক উত্তর: "{{correctAnswer}}"\n\nব্যবহারকারীর উত্তর কতটা মিল আছে? ১ থেকে ৫ এর মধ্যে নম্বর দাও এবং একটি সংক্ষিপ্ত মন্তব্য করো।\n\nOutput format: { \"score\": number, \"feedback\": string }`,
+  prompt: `ব্যবহারকারীর উত্তর: "{{userAnswer}}"\n\nসঠিক উত্তর: "{{correctAnswer}}"\n\nব্যবহারকারীর উত্তর কতটা মিল আছে? ১ থেকে ৫ এর মধ্যে নম্বর দাও এবং একটি সংক্ষিপ্ত মন্তব্য করো।\n\nOutput format: { "score": number, "feedback": string }`,
 });
 
 const evaluateUserAnswerFlow = ai.defineFlow(
@@ -47,6 +48,10 @@ const evaluateUserAnswerFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await evaluateUserAnswerPrompt(input);
-    return output!;
+    if (!output) {
+      console.error(`[${evaluateUserAnswerPrompt.name}] did not return a valid output for input:`, input);
+      throw new Error('AI failed to evaluate the answer.');
+    }
+    return output;
   }
 );
