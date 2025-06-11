@@ -35,7 +35,7 @@ const QuizInterface = () => {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ message: string; isCorrect: boolean; aiEvaluation?: string } | null>(null);
   
-  const [isLoadingQuestion, setIsLoadingQuestion] = useState(true);
+  const [isLoadingQuestion, setIsLoadingQuestion] = useState(false); // Changed initial state from true to false
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [timeLeft, setTimeLeft] = useState(QUESTION_TIMER_SECONDS);
   const [timerActive, setTimerActive] = useState(false);
@@ -250,6 +250,9 @@ const QuizInterface = () => {
   }
 
   const getQuizTopicLabel = (topicValue: string) => {
+    if (topicValue === RANDOM_TOPIC_VALUE) {
+        return QUIZ_TOPICS.find(t => t.value === RANDOM_TOPIC_VALUE)?.label || "এলোমেলো বিষয়";
+    }
     const topicObject = QUIZ_TOPICS.find(t => t.value === topicValue);
     return topicObject ? topicObject.label : DEFAULT_QUIZ_TOPIC;
   };
@@ -335,3 +338,4 @@ const QuizInterface = () => {
 };
 
 export default QuizInterface;
+
