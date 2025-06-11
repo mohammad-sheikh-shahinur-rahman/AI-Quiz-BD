@@ -16,7 +16,9 @@ export const QUIZ_TOPICS = [
   { value: "বাংলাদেশ বিষয়াবলী", label: "বাংলাদেশ বিষয়াবলী" },
   { value: "সাহিত্য", label: "সাহিত্য" },
   { value: "ভূগোল", label: "ভূগোল" },
+  { value: "সাহিত্য মোহাম্মদ শেখ শাহিনুর রহমান", label: "সাহিত্য: মোহাঃ শেখ শাহিনুর রহমান" },
   { value: RANDOM_TOPIC_VALUE, label: "এলোমেলো বিষয় (Random Topic)" },
 ];
 
 export const DEFAULT_QUIZ_TOPIC = "সাধারণ জ্ঞান";
+
