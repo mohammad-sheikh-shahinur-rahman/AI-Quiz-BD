@@ -24,6 +24,7 @@ import {
   QUIZ_TOPICS,
   RANDOM_TOPIC_VALUE
 } from '@/constants/quiz';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { AlertCircle, CheckCircle2, XCircle, ChevronRight, RotateCcw } from 'lucide-react';
 
 const QuizInterface = () => {
@@ -35,7 +36,7 @@ const QuizInterface = () => {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ message: string; isCorrect: boolean; aiEvaluation?: string } | null>(null);
   
-  const [isLoadingQuestion, setIsLoadingQuestion] = useState(false); // Default to false
+  const [isLoadingQuestion, setIsLoadingQuestion] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [timeLeft, setTimeLeft] = useState(QUESTION_TIMER_SECONDS);
   const [timerActive, setTimerActive] = useState(false);
@@ -84,15 +85,15 @@ const QuizInterface = () => {
     setIsLoadingQuestion(true);
     setFeedback(null);
     setSelectedAnswer(null);
-    setCurrentQuestionData(null); // Clear previous question data
-    setCurrentQuestionActualTopicLabel(null); // Clear previous actual topic label
+    setCurrentQuestionData(null); 
+    setCurrentQuestionActualTopicLabel(null); 
 
     let topicForGeneration = baseTopic;
     let actualTopicDisplayValue = "";
 
     if (baseTopic === RANDOM_TOPIC_VALUE) {
       const eligibleTopics = QUIZ_TOPICS.filter(t => t.value !== RANDOM_TOPIC_VALUE);
-      let chosenTopicValue = DEFAULT_QUIZ_TOPIC; // Default if no other topics
+      let chosenTopicValue = DEFAULT_QUIZ_TOPIC; 
       if (eligibleTopics.length > 0) {
         const randomIndex = Math.floor(Math.random() * eligibleTopics.length);
         chosenTopicValue = eligibleTopics[randomIndex].value;
@@ -121,11 +122,10 @@ const QuizInterface = () => {
         description: "প্রশ্ন আনতে ব্যর্থ। অনুগ্রহ করে আবার চেষ্টা করুন।",
         variant: "destructive",
       });
-      // Potentially reset or allow retry
     } finally {
       setIsLoadingQuestion(false);
     }
-  }, [toast, quizState]); // quizState is needed for quizHistory
+  }, [toast, quizState]);
 
   useEffect(() => {
     if (quizState && quizState.currentQuestionNumber <= TOTAL_QUESTIONS && !currentQuestionData && !isLoadingQuestion) {
@@ -260,13 +260,17 @@ const QuizInterface = () => {
         }
         return newState;
       });
-      // setCurrentQuestionData(null); // This will be handled by fetchNewQuestion
-      // setFeedback(null); 
-      // setSelectedAnswer(null); 
-      // setCurrentQuestionActualTopicLabel(null); // This will be handled by fetchNewQuestion
     }
   };
   
+  const handleRestartQuiz = () => {
+     if (typeof window !== 'undefined') {
+      localStorage.removeItem(QUIZ_STORAGE_KEY); // Clear current quiz state
+      // User name and selected topic are preserved for convenience if they want to start with same settings
+    }
+    router.push('/start');
+  };
+
   if (!quizState) {
     return <div className="flex items-center justify-center min-h-screen"><LoadingSpinner /></div>;
   }
@@ -280,17 +284,21 @@ const QuizInterface = () => {
   };
 
   const progressPercentage = (quizState.currentQuestionNumber / TOTAL_QUESTIONS) * 100;
+  const timerProgressPercentage = (timeLeft / QUESTION_TIMER_SECONDS) * 100;
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 bg-background">
       <Card className="w-full max-w-2xl shadow-2xl rounded-xl">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl sm:text-3xl font-headline text-primary">AI কুইজ - {getQuizTopicLabel(quizState.quizTopic)}</CardTitle>
-          <CardDescription>প্রশ্ন নং: {quizState.currentQuestionNumber}/{TOTAL_QUESTIONS} | মোট স্কোর: {quizState.totalScore}</CardDescription>
+          <CardDescription>প্রশ্ন নং: {quizState.currentQuestionNumber > TOTAL_QUESTIONS ? TOTAL_QUESTIONS : quizState.currentQuestionNumber}/{TOTAL_QUESTIONS} | মোট স্কোর: {quizState.totalScore}</CardDescription>
           <Progress value={progressPercentage} className="w-full mt-2" />
           {currentQuestionData && !feedback && (
-             <div className={`mt-4 text-xl font-semibold ${timeLeft <= 10 ? 'text-destructive animate-pulse' : 'text-accent'}`}>
-                সময় বাকি: {timeLeft} সেকেন্ড
+             <div className="mt-4">
+                <div className={`text-xl font-semibold ${timeLeft <= 10 ? 'text-destructive animate-pulse' : 'text-accent'}`}>
+                    সময় বাকি: {timeLeft} সেকেন্ড
+                </div>
+                <Progress value={timerProgressPercentage} className="w-full mt-2 h-2" />
             </div>
           )}
         </CardHeader>
@@ -358,13 +366,28 @@ const QuizInterface = () => {
           )}
         </CardFooter>
       </Card>
-       <Button variant="outline" onClick={() => router.push('/start')} className="mt-8 text-sm">
-        <RotateCcw className="mr-2 h-4 w-4" />
-        নতুন করে শুরু করুন
-      </Button>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button variant="outline" className="mt-8 text-sm">
+            <RotateCcw className="mr-2 h-4 w-4" />
+            নতুন করে শুরু করুন
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>আপনি কি নিশ্চিত?</AlertDialogTitle>
+            <AlertDialogDescription>
+              বর্তমান কুইজের অগ্রগতি হারিয়ে যাবে এবং আপনাকে কুইজ শুরু করার পৃষ্ঠায় নিয়ে যাওয়া হবে। আপনি কি আসলেই নতুন করে শুরু করতে চান?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>বাতিল করুন</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRestartQuiz}>নিশ্চিত করুন</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
 
 export default QuizInterface;
-
