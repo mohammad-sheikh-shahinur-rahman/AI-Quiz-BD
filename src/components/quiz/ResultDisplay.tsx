@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -62,7 +63,14 @@ const ResultDisplay = () => {
         toast({ title: "সফল", description: "ফলাফল শেয়ার করা হয়েছে!" });
       } catch (error) {
         console.error('Error sharing:', error);
-        toast({ title: "ত্রুটি", description: "শেয়ার করতে সমস্যা হয়েছে।", variant: "destructive" });
+        let toastDescription = "শেয়ার করতে সমস্যা হয়েছে।";
+        if (error instanceof DOMException && error.name === 'NotAllowedError') {
+          toastDescription = "শেয়ার করার অনুমতি দেওয়া হয়নি। অনুগ্রহ করে আবার চেষ্টা করুন অথবা ব্রাউজার সেটিংস পরীক্ষা করুন।";
+        } else if (error instanceof Error && (error.message.includes('Permission denied') || error.message.includes('The request is not allowed'))) {
+          // Fallback check for common permission error messages
+          toastDescription = "শেয়ার করার অনুমতি দেওয়া হয়নি। অনুগ্রহ করে ব্রাউজার সেটিংস পরীক্ষা করুন।";
+        }
+        toast({ title: "ত্রুটি", description: toastDescription, variant: "destructive" });
       }
     } else if (navigator.clipboard) {
       try {
@@ -155,3 +163,4 @@ const ResultDisplay = () => {
 };
 
 export default ResultDisplay;
+
