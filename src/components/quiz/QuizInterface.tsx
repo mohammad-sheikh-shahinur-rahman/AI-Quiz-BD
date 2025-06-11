@@ -57,13 +57,17 @@ const QuizInterface = () => {
         if (
             parsedState.userName === storedName && 
             parsedState.currentQuestionNumber > 0 &&
-            parsedState.currentQuestionNumber <= TOTAL_QUESTIONS &&
+            // Allow continuation even if currentQuestionNumber > TOTAL_QUESTIONS (i.e. on result page then navigated back)
+            // The actual question fetching logic will handle TOTAL_QUESTIONS limit.
             parsedState.quizHistory.length === parsedState.currentQuestionNumber - 1
         ) {
            setQuizState(parsedState);
+           // If quiz is already finished and user navigates back, don't auto-fetch.
+           // Let them use "Restart" or handle UI appropriately.
+           // The useEffect below will decide whether to fetch.
            return;
         } else {
-          localStorage.removeItem(QUIZ_STORAGE_KEY);
+          localStorage.removeItem(QUIZ_STORAGE_KEY); // Clear inconsistent state
         }
       }
       const initialTopic = localStorage.getItem(SELECTED_QUIZ_TOPIC_STORAGE_KEY) || DEFAULT_QUIZ_TOPIC;
@@ -81,7 +85,7 @@ const QuizInterface = () => {
     loadQuizState();
   }, [loadQuizState]);
 
-  const fetchNewQuestion = useCallback(async (baseTopic: string) => {
+  const fetchNewQuestion = useCallback(async (baseTopic: string, previouslyAsked: string[]) => {
     setIsLoadingQuestion(true);
     setFeedback(null);
     setSelectedAnswer(null);
@@ -105,8 +109,6 @@ const QuizInterface = () => {
       actualTopicDisplayValue = QUIZ_TOPICS.find(t => t.value === baseTopic)?.label || baseTopic;
     }
         
-    const previouslyAsked = quizState?.quizHistory.map(h => h.questionText) || [];
-
     try {
       const question = await generateQuizQuestion({ topic: topicForGeneration, previouslyAskedQuestions: previouslyAsked });
       setCurrentQuestionData(question);
@@ -122,14 +124,24 @@ const QuizInterface = () => {
         description: "প্রশ্ন আনতে ব্যর্থ। অনুগ্রহ করে আবার চেষ্টা করুন।",
         variant: "destructive",
       });
+      // Potentially reset to allow another attempt or navigate away
     } finally {
       setIsLoadingQuestion(false);
     }
-  }, [toast, quizState]);
+  }, [toast]);
 
+  // useEffect for initial question load or continuation from localStorage
   useEffect(() => {
-    if (quizState && quizState.currentQuestionNumber <= TOTAL_QUESTIONS && !currentQuestionData && !isLoadingQuestion) {
-      fetchNewQuestion(quizState.quizTopic);
+    if (
+      quizState &&
+      quizState.currentQuestionNumber <= TOTAL_QUESTIONS &&
+      !currentQuestionData && // No current question loaded
+      !isLoadingQuestion && // Not already loading
+      // Ensures we only auto-fetch if history matches expected state for this question number
+      quizState.quizHistory.length === quizState.currentQuestionNumber - 1
+    ) {
+      const previouslyAsked = quizState.quizHistory.map(h => h.questionText);
+      fetchNewQuestion(quizState.quizTopic, previouslyAsked);
     }
   }, [quizState, currentQuestionData, isLoadingQuestion, fetchNewQuestion]);
 
@@ -237,7 +249,7 @@ const QuizInterface = () => {
   };
 
   const handleNext = () => {
-    if (!quizState) return;
+    if (!quizState || isLoadingQuestion) return; // Guard against multiple clicks while loading
 
     const nextQuestionNumber = quizState.currentQuestionNumber + 1;
 
@@ -252,15 +264,24 @@ const QuizInterface = () => {
       });
       router.push('/result');
     } else {
+      // Set loading true immediately to prevent useEffect conflicts and show spinner
+      setIsLoadingQuestion(true); 
+      
       setQuizState(prevState => {
-        if (!prevState) return null;
-        const newState = { ...prevState, currentQuestionNumber: nextQuestionNumber };
+        if (!prevState) return null; 
+        const newState = {
+          ...prevState,
+          currentQuestionNumber: nextQuestionNumber,
+        };
         if (typeof window !== 'undefined') {
-            localStorage.setItem(QUIZ_STORAGE_KEY, JSON.stringify(newState));
+          localStorage.setItem(QUIZ_STORAGE_KEY, JSON.stringify(newState));
         }
+        
+        const previouslyAsked = newState.quizHistory.map(h => h.questionText);
+        fetchNewQuestion(newState.quizTopic, previouslyAsked);
+        
         return newState;
       });
-      // Question will be fetched by useEffect
     }
   };
   
@@ -392,3 +413,4 @@ const QuizInterface = () => {
 
 export default QuizInterface;
 
+    
