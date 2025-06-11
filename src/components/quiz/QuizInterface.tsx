@@ -35,7 +35,7 @@ const QuizInterface = () => {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ message: string; isCorrect: boolean; aiEvaluation?: string } | null>(null);
   
-  const [isLoadingQuestion, setIsLoadingQuestion] = useState(false); // Changed initial state from true to false
+  const [isLoadingQuestion, setIsLoadingQuestion] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [timeLeft, setTimeLeft] = useState(QUESTION_TIMER_SECONDS);
   const [timerActive, setTimerActive] = useState(false);
@@ -90,7 +90,7 @@ const QuizInterface = () => {
         const randomIndex = Math.floor(Math.random() * eligibleTopics.length);
         topicForGeneration = eligibleTopics[randomIndex].value;
       } else {
-        topicForGeneration = DEFAULT_QUIZ_TOPIC; // Fallback
+        topicForGeneration = DEFAULT_QUIZ_TOPIC; 
       }
     }
 
@@ -118,27 +118,24 @@ const QuizInterface = () => {
   }, [quizState, currentQuestionData, isLoadingQuestion, fetchNewQuestion]);
 
 
-  useEffect(() => {
-    if (!timerActive || timeLeft <= 0 || !currentQuestionData) return;
-    const intervalId = setInterval(() => {
-      setTimeLeft((prevTime) => prevTime - 1);
-    }, 1000);
-    return () => clearInterval(intervalId);
-  }, [timerActive, timeLeft, currentQuestionData]);
-
   const handleTimeUp = useCallback(() => {
     if (!quizState || !currentQuestionData || feedback) return; 
     
     setTimerActive(false);
-    setFeedback({ message: "সময় শেষ! এই প্রশ্নের জন্য কোন পয়েন্ট নেই।", isCorrect: false });
+    const correctAnswerText = currentQuestionData.correctAnswer;
+    setFeedback({ 
+      message: "সময় শেষ!", 
+      isCorrect: false,
+      aiEvaluation: `দুঃখিত, সময় শেষ। সঠিক উত্তর ছিল: ${correctAnswerText}`
+    });
     
     const historyEntry: QuizHistoryEntry = {
       questionText: currentQuestionData.question,
       options: currentQuestionData.options,
       userSelectedAnswer: null,
-      correctAnswerText: currentQuestionData.correctAnswer,
+      correctAnswerText: correctAnswerText,
       isCorrect: false,
-      aiFeedback: "সময় শেষ! সঠিক উত্তর ছিল: " + currentQuestionData.correctAnswer,
+      aiFeedback: `সময় শেষ! সঠিক উত্তর ছিল: ${correctAnswerText}`,
       pointsAwarded: 0,
     };
 
@@ -154,6 +151,14 @@ const QuizInterface = () => {
       return newState;
     });
   }, [quizState, currentQuestionData, feedback]);
+
+  useEffect(() => {
+    if (!timerActive || timeLeft <= 0 || !currentQuestionData) return;
+    const intervalId = setInterval(() => {
+      setTimeLeft((prevTime) => prevTime - 1);
+    }, 1000);
+    return () => clearInterval(intervalId);
+  }, [timerActive, timeLeft, currentQuestionData]);
 
   useEffect(() => {
     if (timeLeft === 0 && timerActive && currentQuestionData && !feedback) {
@@ -310,14 +315,13 @@ const QuizInterface = () => {
                 <h3 className={`text-lg font-semibold ${feedback.isCorrect ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>{feedback.message}</h3>
               </div>
               {feedback.aiEvaluation && <p className="text-sm text-foreground/80">{feedback.aiEvaluation}</p>}
-              {!feedback.aiEvaluation && feedback.message.includes("সময় শেষ") && currentQuestionData && <p className="text-sm text-foreground/80">সঠিক উত্তর ছিল: {currentQuestionData.correctAnswer}</p>}
             </div>
           )}
         </CardContent>
 
         <CardFooter className="flex justify-end pt-6">
           {!feedback && !isLoadingQuestion && currentQuestionData && (
-            <Button onClick={handleSubmitAnswer} disabled={!selectedAnswer || isEvaluating} size="lg" className="font-semibold">
+            <Button onClick={handleSubmitAnswer} disabled={!selectedAnswer || isEvaluating || timeLeft === 0} size="lg" className="font-semibold">
               উত্তর জমা দিন
             </Button>
           )}
@@ -338,4 +342,3 @@ const QuizInterface = () => {
 };
 
 export default QuizInterface;
-
