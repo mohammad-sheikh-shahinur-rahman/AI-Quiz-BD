@@ -211,7 +211,7 @@ const ResultDisplay = () => {
                   src={resultImageDataUri} 
                   alt={`ফলাফলের ছবি - ${quizState.userName}`} 
                   width={500} 
-                  height={281} 
+                  height={281} // Assuming a 16:9 aspect ratio for the image
                   className="rounded-md mx-auto shadow-md"
                   priority
                 />
@@ -281,4 +281,3 @@ const ResultDisplay = () => {
 };
 
 export default ResultDisplay;
-

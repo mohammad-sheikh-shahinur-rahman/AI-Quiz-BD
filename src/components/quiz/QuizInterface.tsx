@@ -57,22 +57,22 @@ const QuizInterface = () => {
     if (typeof window !== 'undefined') {
       const storedName = localStorage.getItem(USER_NAME_STORAGE_KEY);
       if (!storedName) {
-        setInitializationStatus('redirecting');
+        if (isMountedRef.current) setInitializationStatus('redirecting');
         return;
       }
       
       const storedState = localStorage.getItem(QUIZ_STORAGE_KEY);
+      let loadedState: QuizState | null = null;
       if (storedState) {
         try {
           const parsedState: QuizState = JSON.parse(storedState);
           if (
               parsedState.userName === storedName && 
               parsedState.currentQuestionNumber > 0 &&
-              parsedState.quizHistory.length === parsedState.currentQuestionNumber - 1
+              parsedState.currentQuestionNumber <= TOTAL_QUESTIONS + 1 && // Allow for completion state
+              parsedState.quizHistory.length === Math.min(parsedState.currentQuestionNumber - 1, TOTAL_QUESTIONS)
           ) {
-             setQuizState(parsedState);
-             setInitializationStatus('initialized');
-             return;
+             loadedState = parsedState;
           } else {
             localStorage.removeItem(QUIZ_STORAGE_KEY); 
           }
@@ -81,30 +81,33 @@ const QuizInterface = () => {
           localStorage.removeItem(QUIZ_STORAGE_KEY);
         }
       }
-      const initialTopic = localStorage.getItem(SELECTED_QUIZ_TOPIC_STORAGE_KEY) || DEFAULT_QUIZ_TOPIC;
-      setQuizState({
-        userName: storedName,
-        currentQuestionNumber: 1,
-        totalScore: 0,
-        quizHistory: [],
-        quizTopic: initialTopic 
-      });
-      setInitializationStatus('initialized');
+
+      if (isMountedRef.current) {
+        if (loadedState) {
+           setQuizState(loadedState);
+        } else {
+          const initialTopic = localStorage.getItem(SELECTED_QUIZ_TOPIC_STORAGE_KEY) || DEFAULT_QUIZ_TOPIC;
+          setQuizState({
+            userName: storedName,
+            currentQuestionNumber: 1,
+            totalScore: 0,
+            quizHistory: [],
+            quizTopic: initialTopic 
+          });
+        }
+        setInitializationStatus('initialized');
+      }
     }
   }, []);
 
   useEffect(() => {
-    if (initializationStatus === 'redirecting') {
-      if (isMountedRef.current) {
-        router.replace('/start');
-      }
+    if (initializationStatus === 'redirecting' && isMountedRef.current) {
+      router.replace('/start');
     }
   }, [initializationStatus, router]);
-
-  // Effect to navigate to result page when quiz is over
+ 
   useEffect(() => {
     if (isMountedRef.current && quizState && quizState.currentQuestionNumber > TOTAL_QUESTIONS && initializationStatus === 'initialized') {
-      // Ensure all questions are processed and in history before navigating
       if (quizState.quizHistory.length === TOTAL_QUESTIONS) {
         router.push('/result');
       }
@@ -114,11 +117,13 @@ const QuizInterface = () => {
 
   const fetchNewQuestion = useCallback(async (baseTopic: string, previouslyAsked: string[]) => {
     if (!isMountedRef.current) return;
-    setIsLoadingQuestion(true);
     
     if (isMountedRef.current) {
+      setIsLoadingQuestion(true);
       setFeedback(null);
       setSelectedAnswer(null);
+      setCurrentQuestionData(null); 
+      setCurrentQuestionActualTopicLabel(null);
     }
 
     let topicForGeneration = baseTopic;
@@ -135,22 +140,14 @@ const QuizInterface = () => {
       actualTopicDisplayValue = QUIZ_TOPICS.find(t => t.value === chosenTopicValue)?.label || chosenTopicValue;
     } else {
       topicForGeneration = baseTopic;
+      actualTopicDisplayValue = QUIZ_TOPICS.find(t => t.value === baseTopic)?.label || baseTopic;
     }
         
     try {
-      if (isMountedRef.current) {
-         setCurrentQuestionData(null); 
-         setCurrentQuestionActualTopicLabel(null);
-      }
       const question = await generateQuizQuestion({ topic: topicForGeneration, previouslyAskedQuestions: previouslyAsked });
       if (isMountedRef.current) {
         setCurrentQuestionData(question);
-        if (baseTopic === RANDOM_TOPIC_VALUE) {
-          setCurrentQuestionActualTopicLabel(actualTopicDisplayValue);
-        } else {
-           const topicLabel = QUIZ_TOPICS.find(t => t.value === baseTopic)?.label || baseTopic;
-           setCurrentQuestionActualTopicLabel(topicLabel);
-        }
+        setCurrentQuestionActualTopicLabel(actualTopicDisplayValue);
         setTimeLeft(QUESTION_TIMER_SECONDS);
         setTimerActive(true);
       }
@@ -162,13 +159,14 @@ const QuizInterface = () => {
           description: "প্রশ্ন আনতে ব্যর্থ। অনুগ্রহ করে আবার চেষ্টা করুন।",
           variant: "destructive",
         });
+        // Potentially allow user to retry or skip
       }
     } finally {
       if (isMountedRef.current) {
         setIsLoadingQuestion(false);
       }
     }
-  }, [toast]);
+  }, [toast]); // Removed quizState from dependencies
 
   useEffect(() => {
     if (
@@ -177,12 +175,13 @@ const QuizInterface = () => {
       quizState.currentQuestionNumber <= TOTAL_QUESTIONS &&
       !currentQuestionData &&
       !isLoadingQuestion &&
+      !feedback && // Only fetch if no feedback is being shown (i.e., it's a new question turn)
       quizState.quizHistory.length === quizState.currentQuestionNumber - 1
     ) {
       const previouslyAsked = quizState.quizHistory.map(h => h.questionText);
       fetchNewQuestion(quizState.quizTopic, previouslyAsked);
     }
-  }, [initializationStatus, quizState, currentQuestionData, isLoadingQuestion, fetchNewQuestion]);
+  }, [initializationStatus, quizState, currentQuestionData, isLoadingQuestion, feedback, fetchNewQuestion]);
 
 
   const handleTimeUp = useCallback(() => {
@@ -300,35 +299,25 @@ const QuizInterface = () => {
     
     const nextQuestionNumber = quizState.currentQuestionNumber + 1;
 
-    if (nextQuestionNumber > TOTAL_QUESTIONS) {
-      // Set state to mark quiz completion. Navigation handled by useEffect.
-      if (isMountedRef.current) {
-        setQuizState(prevState => {
-            if (!prevState) return null;
-            const finalState = { ...prevState, currentQuestionNumber: nextQuestionNumber };
-            if (typeof window !== 'undefined') {
-                localStorage.setItem(QUIZ_STORAGE_KEY, JSON.stringify(finalState));
-            }
-            return finalState;
-        });
-      }
-    } else {
-      // Set state to trigger fetching of the next question via an effect.
-      if (isMountedRef.current) {
-        // No need to call fetchNewQuestion directly here.
-        // The useEffect watching quizState (and other dependencies) will handle it.
-        setQuizState(prevState => {
-            if (!prevState) return null; 
-            const newState = {
-                ...prevState,
-                currentQuestionNumber: nextQuestionNumber,
-            };
-            if (typeof window !== 'undefined') {
-                localStorage.setItem(QUIZ_STORAGE_KEY, JSON.stringify(newState));
-            }
-            return newState;
-        });
-      }
+    if (isMountedRef.current) {
+      // Clear current question data and feedback immediately for smoother transition
+      setCurrentQuestionData(null);
+      setFeedback(null);
+      setSelectedAnswer(null);
+      
+      setQuizState(prevState => {
+          if (!prevState) return null; 
+          const newState = {
+              ...prevState,
+              currentQuestionNumber: nextQuestionNumber,
+          };
+          if (typeof window !== 'undefined') {
+              localStorage.setItem(QUIZ_STORAGE_KEY, JSON.stringify(newState));
+          }
+          // If it's not the end of the quiz, fetchNewQuestion will be triggered by the useEffect
+          // watching quizState, currentQuestionData, isLoadingQuestion, feedback.
+          return newState;
+      });
     }
   };
   
@@ -336,19 +325,17 @@ const QuizInterface = () => {
      if (typeof window !== 'undefined') {
       localStorage.removeItem(QUIZ_STORAGE_KEY); 
     }
-    router.push('/start'); // This is a direct navigation from a user action, generally safe.
+    // No need for isMountedRef.current here as navigation is a fire-and-forget action from user interaction
+    router.push('/start');
   };
 
   if (initializationStatus === 'pending' || initializationStatus === 'redirecting' || !quizState) {
     return <div className="flex items-center justify-center min-h-screen"><LoadingSpinner /></div>;
   }
 
-  const getQuizTopicLabel = (topicValue: string) => {
+  const getQuizTopicLabel = (topicValue: string, actualTopicFromQuestion: string | null) => {
     if (topicValue === RANDOM_TOPIC_VALUE) {
-        return QUIZ_TOPICS.find(t => t.value === RANDOM_TOPIC_VALUE)?.label || "এলোমেলো বিষয়";
-    }
-    if (currentQuestionActualTopicLabel && quizState.quizTopic !== RANDOM_TOPIC_VALUE && quizState.quizTopic === topicValue) {
-        return currentQuestionActualTopicLabel;
+      return actualTopicFromQuestion || QUIZ_TOPICS.find(t => t.value === RANDOM_TOPIC_VALUE)?.label || "এলোমেলো বিষয়";
     }
     const topicObject = QUIZ_TOPICS.find(t => t.value === topicValue);
     return topicObject ? topicObject.label : DEFAULT_QUIZ_TOPIC;
@@ -361,7 +348,7 @@ const QuizInterface = () => {
     <div className="flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 bg-background">
       <Card className="w-full max-w-2xl shadow-2xl rounded-xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl sm:text-3xl font-headline text-primary">AI কুইজ - {getQuizTopicLabel(quizState.quizTopic)}</CardTitle>
+          <CardTitle className="text-2xl sm:text-3xl font-headline text-primary">AI কুইজ - {getQuizTopicLabel(quizState.quizTopic, currentQuestionActualTopicLabel)}</CardTitle>
           <CardDescription>প্রশ্ন নং: {quizState.currentQuestionNumber > TOTAL_QUESTIONS ? TOTAL_QUESTIONS : quizState.currentQuestionNumber}/{TOTAL_QUESTIONS} | মোট স্কোর: {quizState.totalScore}</CardDescription>
           <Progress value={progressPercentage} className="w-full mt-2" />
           {currentQuestionData && !feedback && (
@@ -397,13 +384,21 @@ const QuizInterface = () => {
                 className="space-y-3"
               >
                 {currentQuestionData.options.map((option, index) => (
-                  <div key={index} className={`flex items-center space-x-3 p-3 rounded-lg border transition-all duration-300
+                  <div 
+                    key={index} 
+                    className={`flex items-center space-x-2 p-3 rounded-lg border transition-all duration-300
                     ${feedback && option === currentQuestionData.correctAnswer ? 'bg-green-100 dark:bg-green-900 border-green-500' : ''}
                     ${feedback && selectedAnswer === option && option !== currentQuestionData.correctAnswer ? 'bg-red-100 dark:bg-red-900 border-red-500' : ''}
                     ${!feedback && selectedAnswer === option ? 'bg-primary/10 border-primary' : 'border-border hover:bg-muted/50' }`}
                   >
                     <RadioGroupItem value={option} id={`option-${index}`} className="border-primary text-primary focus:ring-primary"/>
                     <Label htmlFor={`option-${index}`} className="text-md sm:text-lg text-foreground/90 cursor-pointer flex-1">{option}</Label>
+                    {feedback && option === currentQuestionData.correctAnswer && (
+                      <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    )}
+                    {feedback && selectedAnswer === option && option !== currentQuestionData.correctAnswer && (
+                      <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                    )}
                   </div>
                 ))}
               </RadioGroup>
@@ -467,5 +462,3 @@ const QuizInterface = () => {
 };
 
 export default QuizInterface;
-
-    
