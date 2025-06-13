@@ -24,11 +24,8 @@
 
 ---
 
-## 🚀 ডেমো
 
-![AI Quiz BD Screenshot](https://ai-quiz-bd.vercel.app/preview.png)
 
----
 
 ## ⚙️ টেকনোলজি স্ট্যাক
 
@@ -98,10 +95,8 @@ OPENAI_API_KEY=your_key_here
 ## 🧑‍💻 নির্মাতা
 
 **মোহাম্মদ শেখ শাহিনুর রহমান**
-👉 [আমার অন্যান্য প্রজেক্ট দেখুন](https://github.com/shahinurrahman)
+👉 [আমার অন্যান্য প্রজেক্ট দেখুন]([https://github.com/shahinurrahman](https://github.com/mohammad-sheikh-shahinur-rahman))
 
-📧 ইমেইল: [aiquizbangladesh@gmail.com](mailto:aiquizbangladesh@gmail.com)
-📱 ফোন: +880 13XXXXXXXX
 
 ---
 
