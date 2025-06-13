@@ -69,7 +69,7 @@ const QuizInterface = () => {
           if (
               parsedState.userName === storedName && 
               parsedState.currentQuestionNumber > 0 &&
-              parsedState.currentQuestionNumber <= TOTAL_QUESTIONS + 1 && // Allow for completion state
+              parsedState.currentQuestionNumber <= TOTAL_QUESTIONS + 1 &&
               parsedState.quizHistory.length === Math.min(parsedState.currentQuestionNumber - 1, TOTAL_QUESTIONS)
           ) {
              loadedState = parsedState;
@@ -120,9 +120,9 @@ const QuizInterface = () => {
     
     if (isMountedRef.current) {
       setIsLoadingQuestion(true);
+      setCurrentQuestionData(null); 
       setFeedback(null);
       setSelectedAnswer(null);
-      setCurrentQuestionData(null); 
       setCurrentQuestionActualTopicLabel(null);
     }
 
@@ -147,7 +147,9 @@ const QuizInterface = () => {
       const question = await generateQuizQuestion({ topic: topicForGeneration, previouslyAskedQuestions: previouslyAsked });
       if (isMountedRef.current) {
         setCurrentQuestionData(question);
-        setCurrentQuestionActualTopicLabel(actualTopicDisplayValue);
+        if (baseTopic === RANDOM_TOPIC_VALUE) {
+            setCurrentQuestionActualTopicLabel(actualTopicDisplayValue);
+        }
         setTimeLeft(QUESTION_TIMER_SECONDS);
         setTimerActive(true);
       }
@@ -159,14 +161,13 @@ const QuizInterface = () => {
           description: "প্রশ্ন আনতে ব্যর্থ। অনুগ্রহ করে আবার চেষ্টা করুন।",
           variant: "destructive",
         });
-        // Potentially allow user to retry or skip
       }
     } finally {
       if (isMountedRef.current) {
         setIsLoadingQuestion(false);
       }
     }
-  }, [toast]); // Removed quizState from dependencies
+  }, [toast]);
 
   useEffect(() => {
     if (
@@ -175,7 +176,7 @@ const QuizInterface = () => {
       quizState.currentQuestionNumber <= TOTAL_QUESTIONS &&
       !currentQuestionData &&
       !isLoadingQuestion &&
-      !feedback && // Only fetch if no feedback is being shown (i.e., it's a new question turn)
+      !feedback && 
       quizState.quizHistory.length === quizState.currentQuestionNumber - 1
     ) {
       const previouslyAsked = quizState.quizHistory.map(h => h.questionText);
@@ -300,10 +301,10 @@ const QuizInterface = () => {
     const nextQuestionNumber = quizState.currentQuestionNumber + 1;
 
     if (isMountedRef.current) {
-      // Clear current question data and feedback immediately for smoother transition
       setCurrentQuestionData(null);
       setFeedback(null);
       setSelectedAnswer(null);
+      setCurrentQuestionActualTopicLabel(null); 
       
       setQuizState(prevState => {
           if (!prevState) return null; 
@@ -314,8 +315,6 @@ const QuizInterface = () => {
           if (typeof window !== 'undefined') {
               localStorage.setItem(QUIZ_STORAGE_KEY, JSON.stringify(newState));
           }
-          // If it's not the end of the quiz, fetchNewQuestion will be triggered by the useEffect
-          // watching quizState, currentQuestionData, isLoadingQuestion, feedback.
           return newState;
       });
     }
@@ -325,7 +324,6 @@ const QuizInterface = () => {
      if (typeof window !== 'undefined') {
       localStorage.removeItem(QUIZ_STORAGE_KEY); 
     }
-    // No need for isMountedRef.current here as navigation is a fire-and-forget action from user interaction
     router.push('/start');
   };
 
@@ -333,10 +331,7 @@ const QuizInterface = () => {
     return <div className="flex items-center justify-center min-h-screen"><LoadingSpinner /></div>;
   }
 
-  const getQuizTopicLabel = (topicValue: string, actualTopicFromQuestion: string | null) => {
-    if (topicValue === RANDOM_TOPIC_VALUE) {
-      return actualTopicFromQuestion || QUIZ_TOPICS.find(t => t.value === RANDOM_TOPIC_VALUE)?.label || "এলোমেলো বিষয়";
-    }
+  const getQuizTopicDisplayLabel = (topicValue: string) => {
     const topicObject = QUIZ_TOPICS.find(t => t.value === topicValue);
     return topicObject ? topicObject.label : DEFAULT_QUIZ_TOPIC;
   };
@@ -348,7 +343,12 @@ const QuizInterface = () => {
     <div className="flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 bg-background">
       <Card className="w-full max-w-2xl shadow-2xl rounded-xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl sm:text-3xl font-headline text-primary">AI কুইজ - {getQuizTopicLabel(quizState.quizTopic, currentQuestionActualTopicLabel)}</CardTitle>
+          <CardTitle className="text-2xl sm:text-3xl font-headline text-primary">AI কুইজ - {getQuizTopicDisplayLabel(quizState.quizTopic)}</CardTitle>
+           {quizState.quizTopic === RANDOM_TOPIC_VALUE && currentQuestionActualTopicLabel && currentQuestionData && !feedback && (
+            <p className="text-sm text-center text-accent font-semibold mt-1">
+              এবারের বিষয়: {currentQuestionActualTopicLabel}
+            </p>
+          )}
           <CardDescription>প্রশ্ন নং: {quizState.currentQuestionNumber > TOTAL_QUESTIONS ? TOTAL_QUESTIONS : quizState.currentQuestionNumber}/{TOTAL_QUESTIONS} | মোট স্কোর: {quizState.totalScore}</CardDescription>
           <Progress value={progressPercentage} className="w-full mt-2" />
           {currentQuestionData && !feedback && (
@@ -371,11 +371,6 @@ const QuizInterface = () => {
           
           {!isLoadingQuestion && currentQuestionData && (
             <div className="space-y-4 animate-fade-in-up">
-              {quizState.quizTopic === RANDOM_TOPIC_VALUE && currentQuestionActualTopicLabel && !feedback && (
-                <p className="text-md text-center text-accent font-semibold">
-                  এবারের বিষয়: {currentQuestionActualTopicLabel}
-                </p>
-              )}
               <h2 className="text-xl sm:text-2xl font-semibold text-foreground leading-relaxed">{currentQuestionData.question}</h2>
               <RadioGroup
                 value={selectedAnswer || ""}
